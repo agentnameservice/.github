@@ -61,35 +61,3 @@ Think of it as **DNS + Certificate Transparency, built for agents.**
 |------|------------|
 | [**ans-registry**](https://github.com/agentnameservice/ans-registry) | ANS design docs, built on the IETF draft specification. |
 
-## Get started
-
-**From the terminal** — the fastest way to register and verify an agent:
-
-```bash
-# macOS / Linux
-brew install agentnameservice/ans/ans-cli
-
-# Windows
-scoop bucket add ans https://github.com/agentnameservice/scoop-ans
-scoop install ans/ans-cli
-```
-
-**In your code** — pick your language:
-[Go](https://github.com/agentnameservice/ans-sdk-go) ·
-[Java](https://github.com/agentnameservice/ans-sdk-java) ·
-[Rust](https://github.com/agentnameservice/ans-sdk-rust)
-
-**Run your own** — stand up the registry and transparency log from the
-[reference implementation](https://github.com/agentnameservice/ans).
-
-## Standards
-
-ANS is built on open standards: the IETF Agent Name Service draft v2, Certificate Transparency
-(RFC 9162, RFC 6962), and COSE / SCITT signed receipts (RFC 8152).
-
-- **ANS v2 draft:** [`draft-narajala-courtney-ansv2`](https://datatracker.ietf.org/doc/draft-narajala-courtney-ansv2/)
-
-## Contributing & license
-
-Contributions are welcome across every repo — see each project's `CONTRIBUTING.md`.
-ANS projects are released under the **MIT License**.
