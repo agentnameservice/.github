@@ -32,10 +32,13 @@ Fixes #
      naming the tool and model, e.g.:
        Assisted-by: Claude Code (claude-fable-5)
      If none was used, write "None". The human submitter remains fully
-     responsible for the correctness and licensing of the contribution. -->
+     responsible for the correctness and licensing of the contribution.
+     Per the kernel convention, AI tools must not add Signed-off-by lines:
+     the DCO certification belongs to the human submitter alone. -->
 
 ## Checklist
 
 - [ ] The PR title follows [Conventional Commits](https://www.conventionalcommits.org) — release notes are generated from it
 - [ ] Tests cover the change
 - [ ] The linked issue above uses a closing keyword
+- [ ] Every commit is signed off (`git commit -s`) certifying the [DCO](https://developercertificate.org)
