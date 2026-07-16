@@ -26,8 +26,13 @@ Fixes #
 
 ## AI assistance
 
-<!-- We welcome AI-assisted contributions with disclosure.
-     Name the tool(s) used (e.g. "Claude Code"), or write "None". -->
+<!-- We follow the Linux kernel convention for AI disclosure:
+     https://docs.kernel.org/process/coding-assistants.html
+     If AI tooling assisted this change, add one Assisted-by line per tool,
+     naming the tool and model, e.g.:
+       Assisted-by: Claude Code (claude-fable-5)
+     If none was used, write "None". The human submitter remains fully
+     responsible for the correctness and licensing of the contribution. -->
 
 ## Checklist
 
