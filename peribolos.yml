@@ -1,27 +1,6 @@
 orgs:
   agentnameservice:
     teams:
-      Maintainers:
-        description: ''
-        maintainers:
-          - csnitker-godaddy
-        members:
-          - jhateley-godaddy
-          - bchen-godaddy
-          - chou-godaddy
-          - jcrisp-godaddy
-        privacy: closed
-        repos:
-          agent-trust-discovery: maintain
-          ans-gateway-auth: maintain
-          ans-openshell: maintain
-          ans-sdk-go: maintain
-          trust-index-spec: maintain
-      Reviewers:
-        description: ''
-        maintainers:
-          - kperry-godaddy
-        privacy: closed
       ans-gateway-auth-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
