@@ -1,0 +1,47 @@
+rulesets:
+  - name: ANS repository checks
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors: []
+    rules:
+      - type: required_status_checks
+        parameters:
+          strict_required_status_checks_policy: false
+          required_status_checks:
+            - context: Build & Test
+              integration_id: 15368
+            - context: Container images & Helm chart (ans-ocsf-hydrator)
+              integration_id: 15368
+            - context: Container images & Helm chart (ans-openshell-interceptor)
+              integration_id: 15368
+            - context: Container images & Helm chart (ans-openshell-middleware)
+              integration_id: 15368
+            - context: Container images & Helm chart (ans-reference-callee)
+              integration_id: 15368
+            - context: DCO
+            - context: Generated bindings match protos
+              integration_id: 15368
+            - context: Lint
+              integration_id: 15368
+  - name: ANS Maintainer merges
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors:
+      - actor_type: Team
+        name: ans-openshell-maintainers
+        bypass_mode: pull_request
+      - actor_type: Team
+        name: tsc-owners
+        bypass_mode: pull_request
+    rules:
+      - type: update

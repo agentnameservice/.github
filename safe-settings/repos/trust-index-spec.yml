@@ -1,0 +1,35 @@
+rulesets:
+  - name: ANS repository checks
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors: []
+    rules:
+      - type: required_status_checks
+        parameters:
+          strict_required_status_checks_policy: false
+          required_status_checks:
+            - context: DCO
+            - context: Lint
+              integration_id: 15368
+  - name: ANS Maintainer merges
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors:
+      - actor_type: Team
+        name: trust-index-spec-maintainers
+        bypass_mode: pull_request
+      - actor_type: Team
+        name: tsc-owners
+        bypass_mode: pull_request
+    rules:
+      - type: update

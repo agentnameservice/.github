@@ -1,0 +1,41 @@
+rulesets:
+  - name: ANS repository checks
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors: []
+    rules:
+      - type: required_status_checks
+        parameters:
+          strict_required_status_checks_policy: false
+          required_status_checks:
+            - context: Build & Test
+              integration_id: 15368
+            - context: DCO
+            - context: Known vulnerabilities
+              integration_id: 15368
+            - context: Lint
+              integration_id: 15368
+            - context: Validate agentgateway recipes
+              integration_id: 15368
+  - name: ANS Maintainer merges
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include:
+          - ~DEFAULT_BRANCH
+        exclude: []
+    bypass_actors:
+      - actor_type: Team
+        name: ans-gateway-auth-maintainers
+        bypass_mode: pull_request
+      - actor_type: Team
+        name: tsc-owners
+        bypass_mode: pull_request
+    rules:
+      - type: update

@@ -123,3 +123,12 @@ orgs:
         privacy: closed
         repos:
           .github: write
+          agent-trust-discovery: write
+          ans: write
+          ans-gateway-auth: write
+          ans-openshell: write
+          ans-registry: write
+          ans-sdk-go: write
+          ans-sdk-java: write
+          ans-sdk-rust: write
+          trust-index-spec: write
