@@ -120,10 +120,16 @@ export async function prepare(gh, config, inputs, actor) {
     const owners = await textFile(gh, name, ".github/CODEOWNERS", sha);
     const entries = codeOwnerEntries(owners);
     const catchall = entries.filter((entry) => entry[0] === "*").at(-1);
+    const reviewers = Object.entries(peribolos.orgs[ORG].teams)
+      .filter(([team, settings]) =>
+        team.endsWith("-reviewers") && settings.repos?.[name] === "write",
+      )
+      .map(([team]) => team);
     const candidates = (catchall?.slice(1) || [])
       .filter(
         (owner) =>
           owner !== `@${ORG}/${TSC}` &&
+          !reviewers.some((team) => owner === `@${ORG}/${team}`) &&
           (name === REPO || owner !== `@${ORG}/${BOOTSTRAP}`),
       )
       .map(
@@ -239,6 +245,7 @@ export async function prepare(gh, config, inputs, actor) {
     const ownerTeams = [
       ...new Set([
         mapping.maintainers,
+        ...reviewers,
         ...(includeTsc ? [TSC] : []),
         ...(mapping.bootstrap ? [BOOTSTRAP] : []),
       ]),

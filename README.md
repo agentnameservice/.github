@@ -19,6 +19,10 @@ approvals required by governance. Its `members` and
 Keep governance decisions in governance documents and GitHub access in this
 configuration. Repository Maintainer pages link here instead of copying rosters.
 
+Repository Reviewer teams use the `-reviewers` suffix and Write access. The
+repository form includes them in CODEOWNERS requirements without adding them
+to merge allowlists.
+
 The repository form imports existing checks, preserves their App bindings, and
 opens a PR for the native YAML changes. Merge queues retain loose checks;
 other repositories require an up-to-date branch. Existing merge queues,

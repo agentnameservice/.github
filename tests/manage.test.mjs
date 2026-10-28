@@ -127,6 +127,51 @@ test("enrollment writes native repository rules and Peribolos grants without cha
   );
 });
 
+test("reviewer teams retain review access without becoming the inferred merge team", async () => {
+  const initial = config();
+  const teams = initial.peribolos.orgs.agentnameservice.teams;
+  teams["custom-maintainers"] = teams["sample-maintainers"];
+  delete teams["sample-maintainers"];
+  teams["sample-reviewers"] = { members: ["reviewer"], repos: { sample: "write" } };
+  teams["other-reviewers"] = { members: ["other"], repos: { other: "write" } };
+  teams["triage-reviewers"] = { members: ["triager"], repos: { sample: "triage" } };
+  const result = await prepare(
+    fake({ owners: "* @agentnameservice/custom-maintainers @agentnameservice/sample-reviewers @agentnameservice/tsc" }),
+    initial,
+    inputs(),
+    "requester",
+  );
+  assert.deepEqual(result.pending, []);
+  assert.deepEqual(result.value.rulesets[1].bypass_actors, [
+    { actor_type: "Team", name: "custom-maintainers", bypass_mode: "pull_request" },
+  ]);
+  for (const team of ["sample-reviewers", "other-reviewers", "triage-reviewers"])
+    assert.deepEqual(result.peribolos.orgs.agentnameservice.teams[team], teams[team]);
+});
+
+test("configured reviewer routing is required and undeclared owners remain blocked", async () => {
+  const initial = config();
+  initial.peribolos.orgs.agentnameservice.teams["sample-reviewers"] = {
+    members: ["reviewer"], repos: { sample: "write" },
+  };
+  for (const owners of [
+    "* @agentnameservice/sample-maintainers @agentnameservice/tsc",
+    "* @agentnameservice/sample-maintainers @agentnameservice/sample-reviewers @agentnameservice/rogue-reviewers @agentnameservice/tsc",
+  ]) {
+    const result = await prepare(
+      fake({ owners }), initial, { ...inputs(), operation: "Inspect repository" }, "requester",
+    );
+    assert.ok(result.pending.includes(
+      "Merge CODEOWNERS with * @agentnameservice/sample-maintainers @agentnameservice/sample-reviewers @agentnameservice/tsc.",
+    ));
+    assert.deepEqual(result.value.rulesets[1].bypass_actors.map(a => a.name), ["sample-maintainers"]);
+    await assert.rejects(
+      prepare(fake({ owners }), initial, inputs(), "requester"),
+      /Merge CODEOWNERS with .*sample-reviewers/,
+    );
+  }
+});
+
 test("merge queues retain loose checks while non-queued repositories stay strict", async () => {
   const result = await prepare(
     fake({ queued: true }),
