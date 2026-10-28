@@ -52,6 +52,11 @@ or direct collaborators. It preserves team names. Team deletion is disabled by
 `--maximum-removal-delta=0`; membership and grant changes follow the reviewed YAML.
 Manual changes to managed teams are reconciled to that configuration.
 
+Peribolos's [native dump](https://github.com/kubernetes-sigs/prow/blob/main/site/content/en/docs/components/cli-tools/peribolos.md#initial-seed)
+can capture existing teams. Review its `orgs.agentnameservice.teams` section and
+retain approved pending invitations; raw billing/contact metadata stays outside
+this repository. Safe Settings provides a [native repository exporter](https://github.com/github-community-projects/safe-settings#generating-settings-from-existing-configuration).
+
 Only repositories in [the settings scope](safe-settings/deployment-settings.yml)
 receive Safe Settings changes. [Repository configs](safe-settings/repos) can be
 prepared before enrollment. Pausing settings leaves existing access unchanged.
