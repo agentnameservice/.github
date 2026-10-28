@@ -59,7 +59,7 @@ jobs:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: read
         with:
-          client-id: ${{ vars.ORG_APP_CLIENT_ID }}
+          client-id: ${{ secrets.ORG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
           owner: agentnameservice
           permission-administration: read
@@ -83,7 +83,7 @@ jobs:
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: write
         with:
-          client-id: ${{ vars.ORG_APP_CLIENT_ID }}
+          client-id: ${{ secrets.ORG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
           owner: agentnameservice
           repositories: .github

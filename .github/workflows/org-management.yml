@@ -47,7 +47,7 @@ jobs:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: token
         with:
-          client-id: ${{ vars.ORG_APP_CLIENT_ID }}
+          client-id: ${{ secrets.ORG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
           owner: agentnameservice
           permission-members: read
@@ -66,7 +66,7 @@ jobs:
           printf '%s\n' "$APP_KEY" > "$RUNNER_TEMP/org-app.pem"
       - name: Reconcile teams and membership
         env:
-          APP_ID: ${{ vars.ORG_APP_ID }}
+          APP_ID: ${{ secrets.ORG_APP_ID }}
         run: |
           args=(--config-path=/workspace/peribolos.yml --github-app-id="$APP_ID" --github-app-private-key-path=/key.pem --fix-teams --fix-team-members --maximum-removal-delta=0)
           if [ "$APPLY" = true ]; then args+=(--confirm); fi
@@ -87,7 +87,7 @@ jobs:
           ADMIN_REPO: .github
           CONFIG_PATH: safe-settings
           DEPLOYMENT_CONFIG_FILE: ${{ github.workspace }}/safe-settings/deployment-settings.yml
-          APP_ID: ${{ vars.ORG_APP_ID }}
+          APP_ID: ${{ secrets.ORG_APP_ID }}
           PRIVATE_KEY: ${{ secrets.ORG_APP_PRIVATE_KEY }}
           FULL_SYNC_NOP: ${{ env.APPLY != 'true' }}
           CREATE_PR_COMMENT: 'false'
@@ -95,7 +95,7 @@ jobs:
         run: npm run full-sync
       - name: Reconcile team repository access after protections succeed
         env:
-          APP_ID: ${{ vars.ORG_APP_ID }}
+          APP_ID: ${{ secrets.ORG_APP_ID }}
         run: |
           args=(--config-path=/workspace/peribolos.yml --github-app-id="$APP_ID" --github-app-private-key-path=/key.pem --fix-teams --fix-team-repos --maximum-removal-delta=0)
           if [ "$APPLY" = true ]; then args+=(--confirm); fi

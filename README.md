@@ -37,7 +37,7 @@ Webhooks are disabled. Governance can remain private.
 
 | Setting | Location |
 | --- | --- |
-| `ORG_APP_ID`, `ORG_APP_CLIENT_ID` | Repository Actions variables |
+| `ORG_APP_ID`, `ORG_APP_CLIENT_ID` | Repository Actions secrets |
 | `ORG_APP_PRIVATE_KEY` | Secret in the `org-management` environment, restricted to `main` |
 | `ORG_MANAGEMENT_ENABLED` | Repository variable; `false` stops management |
 | `ORG_AUTO_APPLY` | Repository variable; `true` applies on pushes and the schedule |
