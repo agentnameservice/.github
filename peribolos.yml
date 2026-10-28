@@ -90,7 +90,16 @@ orgs:
           - scourtney-godaddy
         privacy: closed
         repos:
+          agent-trust-discovery: write
+          ans: write
+          ans-gateway-auth: write
+          ans-openshell: write
+          ans-registry: write
+          ans-sdk-go: write
+          ans-sdk-java: write
+          ans-sdk-rust: write
           governance: write
+          trust-index-spec: write
         members:
           - kantorcodes
           - kenhuangus

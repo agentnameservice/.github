@@ -61,6 +61,10 @@ Only repositories in [the settings scope](safe-settings/deployment-settings.yml)
 receive Safe Settings changes. [Repository configs](safe-settings/repos) can be
 prepared before enrollment. Pausing settings leaves existing access unchanged.
 
+`homebrew-ans` and `scoop-ans` are excluded from protection management because
+GoReleaser publishes their generated package updates directly to `main`.
+Their Maintainer team access is still managed through Peribolos.
+
 ## Development
 
 ```sh

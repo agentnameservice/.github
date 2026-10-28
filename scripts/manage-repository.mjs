@@ -85,6 +85,10 @@ export async function prepare(gh, config, inputs, actor) {
     ),
     "Choose a supported operation",
   );
+  ensure(
+    !config.deployment.restrictedRepos.exclude?.includes(name),
+    `${name}: excluded from settings management by deployment-settings.yml`,
+  );
   await owner(gh, actor);
   const info = await publicRepository(gh, name);
   const value = structuredClone(config.repositories[name] || {});

@@ -350,3 +350,21 @@ test("checked-in scope starts with .github; ans preserves its real queued CI", a
     "tsc-owners",
   );
 });
+
+test("package repositories remain excluded from protection enrollment", async () => {
+  const actual = await configuration();
+  for (const repository of ["homebrew-ans", "scoop-ans"]) {
+    await assert.rejects(
+      prepare(fake(), actual, { ...inputs(), repository }, "requester"),
+      /excluded from settings management/,
+    );
+  }
+});
+
+test("explicit exclusions cannot be overridden by the include list", async () => {
+  for (const repository of ["homebrew-ans", "scoop-ans"]) {
+    const actual = await configuration();
+    actual.included.add(repository);
+    assert.throws(() => validate(actual), /excluded repositories/);
+  }
+});

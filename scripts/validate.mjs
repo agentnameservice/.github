@@ -70,6 +70,13 @@ export function validate(config) {
       config.settings.additive_plugins.includes("labels"),
     "Preserve unrelated rules and labels",
   );
+  const excluded = config.deployment.restrictedRepos.exclude || [];
+  ensure(Array.isArray(excluded), "Repository exclusions must be a list");
+  // Safe Settings prioritizes include over exclude.
+  ensure(
+    [...config.included].every((name) => !excluded.includes(name)),
+    "Keep excluded repositories outside the settings scope",
+  );
   for (const name of config.included)
     ensure(
       config.repositories[name],
