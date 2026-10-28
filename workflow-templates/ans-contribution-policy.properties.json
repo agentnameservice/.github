@@ -1,0 +1,5 @@
+{
+  "name": "ANS contribution policy",
+  "description": "Check Conventional Commit PR titles, linked issues, and specification labels using the shared ANS policy.",
+  "categories": ["Automation"]
+}

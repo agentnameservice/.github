@@ -1,0 +1,16 @@
+name: Change request
+description: Discuss a change before opening a pull request.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What change do you suggest?
+      description: Describe the behavior and any alternatives. Formal proposals follow the governance repository's proposal process.
+    validations:
+      required: true

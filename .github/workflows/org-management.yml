@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Organization management
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview changes or apply the reviewed configuration
+        type: choice
+        options: [preview, apply]
+        default: preview
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 */6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: organization-management
+  cancel-in-progress: false
+
+jobs:
+  synchronize:
+    if: >-
+      github.repository == 'agentnameservice/.github' &&
+      github.ref == 'refs/heads/main' &&
+      vars.ORG_MANAGEMENT_ENABLED == 'true'
+    environment: org-management
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APPLY: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply') || (github.event_name != 'workflow_dispatch' && vars.ORG_AUTO_APPLY == 'true') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run validate
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: token
+        with:
+          client-id: ${{ vars.ORG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          owner: agentnameservice
+          permission-administration: ${{ env.APPLY == 'true' && 'write' || 'read' }}
+          permission-members: ${{ env.APPLY == 'true' && 'write' || 'read' }}
+          permission-contents: read
+      - name: Verify manual apply requester
+        if: github.event_name == 'workflow_dispatch' && env.APPLY == 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REQUESTER: ${{ github.triggering_actor }}
+        run: node --input-type=module -e "import {github,owner} from './scripts/github.mjs'; await owner(github(),process.env.REQUESTER)"
+      - name: Prepare roster teams before resolving rule exceptions
+        id: teams
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REQUESTER: ${{ github.triggering_actor }}
+          GRANT_ACCESS: 'false'
+        run: node scripts/sync-rosters.mjs
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: github-community-projects/safe-settings
+          ref: a9a1f366ad6a738b55682d346d94f8d6c4893b09 # 3.0.0
+          path: .safe-settings
+          persist-credentials: false
+      - run: npm ci --ignore-scripts --omit=dev --no-audit --no-fund
+        working-directory: .safe-settings
+      - name: Run the documented Safe Settings synchronizer
+        id: settings
+        working-directory: .safe-settings
+        env:
+          GH_ORG: agentnameservice
+          ADMIN_REPO: .github
+          CONFIG_PATH: safe-settings
+          DEPLOYMENT_CONFIG_FILE: ${{ github.workspace }}/safe-settings/deployment-settings.yml
+          APP_ID: ${{ vars.ORG_APP_ID }}
+          PRIVATE_KEY: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          FULL_SYNC_NOP: ${{ env.APPLY != 'true' }}
+          CREATE_PR_COMMENT: 'false'
+          CREATE_ERROR_ISSUE: 'false'
+        run: npm run full-sync
+      - name: Grant repository access after protections succeed
+        id: grants
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REQUESTER: ${{ github.triggering_actor }}
+        run: node scripts/sync-rosters.mjs

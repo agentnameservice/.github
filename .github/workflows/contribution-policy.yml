@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Contribution policy
+
+on:
+  workflow_call:
+    inputs:
+      specification:
+        description: Require exactly one of editorial or normative on specification PRs
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    name: Contribution policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No checkout and no interpolation of contributor-controlled text into shell code.
+      - name: Check PR metadata
+        env:
+          SPECIFICATION_REPOSITORY: ${{ inputs.specification }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          with open(os.environ['GITHUB_EVENT_PATH']) as handle:
+              event = json.load(handle)
+          pr = event.get('pull_request')
+          if pr is None:
+              if os.environ['GITHUB_EVENT_NAME'] == 'merge_group':
+                  print('PR metadata was checked before queue entry; merge groups have no PR metadata.')
+                  sys.exit(0)
+              raise SystemExit('This workflow requires pull_request or merge_group.')
+          errors = []
+          if not re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spec)(\([^\r\n()]+\))?!?: \S', pr['title']):
+              errors.append('Use a Conventional Commit PR title, such as docs: explain the setup.')
+          body = re.sub(r'<!--[\s\S]*?-->', '', pr.get('body') or '')
+          if not re.search(r'\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)\b', body, re.I):
+              errors.append('Link a real issue using Fixes, Closes, or Resolves.')
+          if os.environ['SPECIFICATION_REPOSITORY'] == 'true':
+              labels = {label['name'] for label in pr.get('labels', [])}
+              if len(labels & {'editorial', 'normative'}) != 1:
+                  errors.append('Apply exactly one specification label: editorial or normative.')
+          for error in errors:
+              print(error)
+          sys.exit(bool(errors))
+          PY

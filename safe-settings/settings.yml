@@ -1,0 +1,14 @@
+# Native Safe Settings controls. Shared policy is in suborgs/defaults.yml.
+ruleset_scope: repo
+
+disable_plugins:
+  - repository
+  - archive
+  - branches
+  - teams
+  - collaborators
+  - app_installations
+  - custom_repository_roles
+
+# Preserve existing labels and repository rulesets.
+additive_plugins: [labels, rulesets]

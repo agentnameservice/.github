@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# Select this template in each ANS repository's Actions tab.
+# main is intentional for this first-party shared policy; changes require review
+# in the protected organization configuration repository.
+name: Check contribution metadata
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  contribution:
+    uses: agentnameservice/.github/.github/workflows/contribution-policy.yml@main
+    with:
+      specification: ${{ github.event.repository.name == 'ans-registry' }}
