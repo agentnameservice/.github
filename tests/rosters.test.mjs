@@ -125,7 +125,7 @@ test("package repositories share the SDK roster without coupling bootstrap hando
       "homebrew-ans": tap,
       "ans-sdk-go": sdk,
     }),
-    { maintainers: ["alice"], reviewers: ["bob"] },
+    { maintainers: ["alice"], reviewers: ["bob"], source: "ans-sdk-go" },
   );
 });
 
@@ -174,6 +174,7 @@ test("private governance is read by pinned default-branch SHA; other private sou
   assert.deepEqual(await roster(gh, "governance", {}), {
     maintainers: ["alice"],
     reviewers: [],
+    source: "governance",
   });
   assert.equal(reads[0].path, "TSC.md");
   assert.equal(reads[0].ref, "a".repeat(40));
@@ -392,6 +393,31 @@ test("conflicting shared roster blocks that team without blocking others", async
         (w.data.name || w.data.team_slug) === "tsc",
     ),
   );
+});
+
+test("shared-roster team mismatches block access until the configuration is updated", async () => {
+  const { gh, writes } = fake();
+  const source = override("shared");
+  const destination = override("shared");
+  destination.teams = destination.teams.filter(
+    (t) => t.name !== "shared-reviewers",
+  );
+  const result = await synchronize(
+    gh,
+    { repositories: { a: source, b: destination }, excluded: new Set() },
+    true,
+    async (client, name) =>
+      name === "b"
+        ? { ...(await people(client, name)), source: "a" }
+        : people(client, name),
+    quiet,
+  );
+  assert.ok(
+    result.errors.some((error) =>
+      error.includes("Shared rosters must use the same teams"),
+    ),
+  );
+  assert.ok(!writes.some((w) => w.method === "grant" && w.data.repo === "b"));
 });
 test("nested or externally used teams cannot be overwritten", async () => {
   for (const state of [

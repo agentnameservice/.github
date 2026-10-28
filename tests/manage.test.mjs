@@ -78,7 +78,6 @@ test("enrollment writes native configuration and imports existing checks", async
   const result = await prepare(fake(), config(), inputs(), "requester");
   assert.deepEqual(result.value.teams, [
     { name: "sample-maintainers", permission: "push" },
-    { name: "sample-reviewers", permission: "push" },
     { name: "tsc", permission: "push" },
   ]);
   assert.deepEqual(
@@ -94,6 +93,213 @@ test("enrollment writes native configuration and imports existing checks", async
     context: "DCO",
   });
   assert.throws(() => validate(full), /additional/);
+});
+
+test("Reviewer teams are created only for nonempty rosters and retained when explicitly configured", async () => {
+  const empty = await prepare(fake(), config(), inputs(), "requester");
+  assert.ok(!empty.value.teams.some((t) => t.name.endsWith("-reviewers")));
+  const gh = fake();
+  const content = gh.rest.repos.getContent;
+  gh.rest.repos.getContent = async (args) => {
+    const response = await content(args);
+    if (args.repo === "sample" && args.path === "MAINTAINERS.md")
+      response.data.content = Buffer.from(roster + "| @bob |\n").toString(
+        "base64",
+      );
+    return response;
+  };
+  const populated = await prepare(gh, config(), inputs(), "requester");
+  assert.ok(populated.value.teams.some((t) => t.name === "sample-reviewers"));
+  const existing = config();
+  existing.repositories.sample = populated.value;
+  const retained = await prepare(fake(), existing, inputs(), "requester");
+  assert.ok(retained.value.teams.some((t) => t.name === "sample-reviewers"));
+});
+
+test("a new package repository reuses the source's actual Reviewer team", async () => {
+  for (const hasReviewers of [false, true]) {
+    const sdkGh = fake();
+    const sdkContent = sdkGh.rest.repos.getContent;
+    sdkGh.rest.repos.getContent = async (args) => {
+      const response = await sdkContent(args);
+      if (
+        args.repo === "sample" &&
+        args.path === "MAINTAINERS.md" &&
+        hasReviewers
+      )
+        response.data.content = Buffer.from(roster + "| @bob |\n").toString(
+          "base64",
+        );
+      return response;
+    };
+    const { value } = await prepare(sdkGh, config(), inputs(), "requester");
+    if (hasReviewers)
+      value.teams.find((t) => t.name === "sample-reviewers").name =
+        "sdk-review-team";
+    const current = config();
+    current.repositories.sample = value;
+    const gh = fake();
+    const original = gh.rest.repos.getContent;
+    gh.rest.repos.getContent = async (args) => {
+      const response = await original(args);
+      if (args.repo === "tap" && args.path === "MAINTAINERS.md")
+        response.data.content = Buffer.from(
+          "Roster source: agentnameservice/sample/MAINTAINERS.md\n",
+        ).toString("base64");
+      if (
+        args.repo === "sample" &&
+        args.path === "MAINTAINERS.md" &&
+        hasReviewers
+      )
+        response.data.content = Buffer.from(roster + "| @bob |\n").toString(
+          "base64",
+        );
+      return response;
+    };
+    const result = await prepare(
+      gh,
+      current,
+      { ...inputs(), repository: "tap" },
+      "requester",
+    );
+    assert.deepEqual(result.value.teams, value.teams);
+  }
+});
+
+test("a shared roster cannot enroll under a different Maintainer team", async () => {
+  const { value } = await prepare(fake(), config(), inputs(), "requester");
+  const current = config();
+  current.repositories.sample = value;
+  const gh = fake(
+    "admin",
+    true,
+    "* @agentnameservice/other-maintainers @agentnameservice/tsc",
+  );
+  const original = gh.rest.repos.getContent;
+  gh.rest.repos.getContent = async (args) => {
+    const response = await original(args);
+    if (args.repo === "tap" && args.path === "MAINTAINERS.md")
+      response.data.content = Buffer.from(
+        "Roster source: agentnameservice/sample/MAINTAINERS.md\n",
+      ).toString("base64");
+    return response;
+  };
+  await assert.rejects(
+    prepare(gh, current, { ...inputs(), repository: "tap" }, "requester"),
+    /same Maintainer team/,
+  );
+});
+
+test("an existing package configuration can adopt Reviewers added to its source", async () => {
+  const { value } = await prepare(fake(), config(), inputs(), "requester");
+  const current = config();
+  current.repositories.sample = structuredClone(value);
+  current.repositories.tap = structuredClone(value);
+  current.repositories.sample.teams.push({
+    name: "sdk-review-team",
+    permission: "push",
+  });
+  const gh = fake();
+  const original = gh.rest.repos.getContent;
+  gh.rest.repos.getContent = async (args) => {
+    const response = await original(args);
+    if (args.path === "MAINTAINERS.md")
+      response.data.content = Buffer.from(
+        args.repo === "tap"
+          ? "Roster source: agentnameservice/sample/MAINTAINERS.md\n"
+          : roster + "| @bob |\n",
+      ).toString("base64");
+    return response;
+  };
+  const result = await prepare(
+    gh,
+    current,
+    { ...inputs(), repository: "tap" },
+    "requester",
+  );
+  assert.ok(result.value.teams.some((t) => t.name === "sdk-review-team"));
+});
+
+test("updates retain configured App bindings despite unbound live contexts", async () => {
+  const { value } = await prepare(fake(), config(), inputs(), "requester");
+  value.rulesets[0].rules[0].parameters.required_status_checks = [
+    { context: "test", integration_id: 15368 },
+  ];
+  const current = config();
+  current.repositories.sample = value;
+  for (const required_checks of [undefined, "test;build"]) {
+    const result = await prepare(
+      fake(),
+      current,
+      { ...inputs(), required_checks },
+      "requester",
+    );
+    const checks =
+      result.value.rulesets[0].rules[0].parameters.required_status_checks;
+    assert.deepEqual(
+      checks.find((c) => c.context === "test"),
+      { context: "test", integration_id: 15368 },
+    );
+    if (required_checks)
+      assert.deepEqual(
+        checks.find((c) => c.context === "build"),
+        { context: "build" },
+      );
+  }
+});
+
+test("imports preserve classic and ruleset App bindings without duplicate checks", async () => {
+  const gh = fake();
+  gh.rest.repos.getBranchProtection = async () => ({
+    data: {
+      required_status_checks: {
+        contexts: ["DCO", "test"],
+        checks: [{ context: "test", app_id: 15368 }],
+      },
+    },
+  });
+  const paginate = gh.paginate;
+  gh.paginate = async (route, args) =>
+    route.startsWith("GET /repos/")
+      ? [
+          {
+            type: "required_status_checks",
+            parameters: {
+              required_status_checks: [
+                { context: "test", integration_id: 15368 },
+                { context: "build", integration_id: 42 },
+              ],
+            },
+          },
+        ]
+      : paginate(route, args);
+  const result = await prepare(gh, config(), inputs(), "requester");
+  assert.deepEqual(
+    result.value.rulesets[0].rules[0].parameters.required_status_checks,
+    [
+      { context: "build", integration_id: 42 },
+      { context: "test", integration_id: 15368 },
+    ],
+  );
+});
+
+test("conflicting App bindings are reported instead of silently choosing one", async () => {
+  const { value } = await prepare(fake(), config(), inputs(), "requester");
+  value.rulesets[0].rules[0].parameters.required_status_checks = [
+    { context: "test", integration_id: 15368 },
+  ];
+  const current = config();
+  current.repositories.sample = value;
+  const gh = fake();
+  gh.rest.repos.getBranchProtection = async () => ({
+    data: {
+      required_status_checks: { checks: [{ context: "test", app_id: 42 }] },
+    },
+  });
+  await assert.rejects(
+    prepare(gh, current, inputs(), "requester"),
+    /Conflicting App bindings for test/,
+  );
 });
 test("inspection does not require a signoff or issue", async () => {
   const result = await prepare(

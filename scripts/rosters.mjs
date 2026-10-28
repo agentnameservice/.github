@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { access, ensure, loginPattern } from "./config.mjs";
+import { ensure, loginPattern } from "./config.mjs";
 import {
   textFile,
   publicRepository,
@@ -90,7 +90,8 @@ export async function roster(gh, name, repositories) {
       pointers.length <= 1,
     "Malformed roster reference",
   );
-  if (!pointers.length) return parseRoster(text, name === "governance");
+  if (!pointers.length)
+    return { ...parseRoster(text, name === "governance"), source: name };
   ensure(
     name !== "governance",
     "The TSC roster must come from governance/TSC.md",
@@ -103,13 +104,6 @@ export async function roster(gh, name, repositories) {
       !text.includes("## Reviewers"),
     "Use one declared shared roster without duplicate tables",
   );
-  const destinationTeams = access(name, repositories[name]);
-  const sourceTeams = access(source, repositories[source]);
-  ensure(
-    destinationTeams.maintainers === sourceTeams.maintainers &&
-      destinationTeams.reviewers === sourceTeams.reviewers,
-    "Shared rosters must use the same teams",
-  );
   const sourceInfo = await publicRepository(gh, source);
   const sourceHead = await head(gh, source, sourceInfo.default_branch);
   const sourceText = await textFile(gh, source, "MAINTAINERS.md", sourceHead);
@@ -117,5 +111,5 @@ export async function roster(gh, name, repositories) {
     sourceText && !sourceText.includes("Roster source:"),
     "Chained roster references are not supported",
   );
-  return parseRoster(sourceText);
+  return { ...parseRoster(sourceText), source };
 }

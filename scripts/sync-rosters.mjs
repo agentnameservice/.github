@@ -73,6 +73,17 @@ export async function synchronize(
             ? bootstrap
             : await readRoster(gh, repo, config.repositories);
       ensure(people, "The TSC voting roster is unavailable");
+      if (people.source && people.source !== repo) {
+        const source = access(
+          people.source,
+          config.repositories[people.source],
+        );
+        ensure(
+          mapping.maintainers === source.maintainers &&
+            mapping.reviewers === source.reviewers,
+          "Shared rosters must use the same teams",
+        );
+      }
       ensure(
         mapping.reviewers || !people.reviewers.length,
         "Declare a Reviewer team before adding Reviewers",

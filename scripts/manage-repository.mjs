@@ -143,9 +143,6 @@ export async function prepare(gh, config, inputs, actor) {
             { ".github": "tsc-owners", governance: "tsc" }[name] ||
             `${name.replace(/[^a-z\d]+/g, "-")}-maintainers`,
         };
-    if (!mapping.reviewers && ![".github", "governance"].includes(name))
-      mapping.reviewers =
-        mapping.maintainers.replace(/-maintainers$/, "") + "-reviewers";
     const bootstrapChoice = inputs.bootstrap_access || "Keep current";
     ensure(
       ["Keep current", "Enable", "Remove"].includes(bootstrapChoice),
@@ -160,21 +157,71 @@ export async function prepare(gh, config, inputs, actor) {
       name !== REPO ||
       value.teams?.some((t) => t.name === TSC) ||
       catchall?.includes(`@${ORG}/${TSC}`);
+    try {
+      const people = await roster(gh, name, config.repositories);
+      if (people.source !== name) {
+        const shared = access(
+          people.source,
+          config.repositories[people.source],
+        );
+        ensure(
+          mapping.maintainers === shared.maintainers,
+          "Shared rosters must use the same Maintainer team",
+        );
+        ensure(
+          shared.reviewers || !people.reviewers.length,
+          "Configure the source repository's Reviewer team first",
+        );
+        mapping.reviewers = shared.reviewers;
+      } else if (
+        people.reviewers.length &&
+        !mapping.reviewers &&
+        ![REPO, "governance"].includes(name)
+      ) {
+        mapping.reviewers =
+          mapping.maintainers.replace(/-maintainers$/, "") + "-reviewers";
+      }
+      if (includeTsc && name !== "governance")
+        await roster(gh, "governance", config.repositories);
+      if (mapping.bootstrap) await roster(gh, REPO, config.repositories);
+    } catch (error) {
+      pending.push(error.message);
+    }
     const previous =
       value.rulesets
         ?.find((r) => r.name === CHECKS)
         ?.rules?.find((r) => r.type === "required_status_checks")?.parameters
         ?.required_status_checks || [];
-    const required = new Set([
-      ...previous.map((c) => c.context),
-      ...(existing.required_status_checks?.contexts || []),
-      ...(existing.required_status_checks?.checks || []).map((c) => c.context),
-    ]);
-    for (const rule of rules) {
-      if (rule.type === "required_status_checks")
-        rule.parameters.required_status_checks.forEach((c) =>
-          required.add(c.context),
-        );
+    const required = new Map();
+    for (const check of [
+      ...previous,
+      ...(existing.required_status_checks?.contexts || []).map((context) => ({
+        context,
+      })),
+      ...(existing.required_status_checks?.checks || []).map(
+        ({ context, app_id }) => ({
+          context,
+          ...(app_id > 0 ? { integration_id: app_id } : {}),
+        }),
+      ),
+      ...rules
+        .filter((r) => r.type === "required_status_checks")
+        .flatMap((r) => r.parameters.required_status_checks),
+    ]) {
+      if (check.context === "DCO") continue;
+      const current = required.get(check.context);
+      ensure(
+        current?.integration_id == null ||
+          check.integration_id == null ||
+          current.integration_id === check.integration_id,
+        `Conflicting App bindings for ${check.context}; resolve its existing requirements first`,
+      );
+      required.set(
+        check.context,
+        check.integration_id != null
+          ? { ...current, ...check }
+          : current || check,
+      );
     }
     const selected = inputs.required_checks?.trim()
       ? new Set(
@@ -183,7 +230,7 @@ export async function prepare(gh, config, inputs, actor) {
             .map((c) => c.trim())
             .filter(Boolean),
         )
-      : required;
+      : new Set(required.keys());
     selected.add("DCO");
     value.teams = [
       ...new Set(
@@ -216,7 +263,7 @@ export async function prepare(gh, config, inputs, actor) {
               required_status_checks: [...selected]
                 .filter((c) => c !== "DCO")
                 .sort()
-                .map((context) => ({ context })),
+                .map((context) => required.get(context) || { context }),
             },
           },
         ],
@@ -252,14 +299,6 @@ export async function prepare(gh, config, inputs, actor) {
         pending.push(
           `Include @${ORG}/${team} on every CODEOWNERS rule, including path-specific overrides.`,
         );
-    try {
-      await roster(gh, name, { ...config.repositories, [name]: value });
-      if (includeTsc && name !== "governance")
-        await roster(gh, "governance", config.repositories);
-      if (mapping.bootstrap) await roster(gh, REPO, config.repositories);
-    } catch (error) {
-      pending.push(error.message);
-    }
     if (selected.size < 2)
       pending.push(
         "Select the actual CI checks from the observed list; requirements are not guessed.",
