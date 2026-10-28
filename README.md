@@ -1,56 +1,60 @@
 # ANS organization management
 
-This repository contains ANS's organization profile, contribution guidance,
-and GitHub configuration. Actions runs Safe Settings and synchronizes teams
-from repository rosters.
+GitHub Actions runs [Peribolos](https://github.com/kubernetes-sigs/prow/tree/main/cmd/peribolos)
+for teams and access, and [Safe Settings](https://github.com/github-community-projects/safe-settings)
+for repository protections. No server or Kubernetes cluster is required.
 
 ## Making changes
 
 | Change | Where |
 | --- | --- |
-| Project Maintainers and Reviewers | The project's `MAINTAINERS.md` |
-| TSC members | `governance/TSC.md` |
-| Administrators of this repository | [MAINTAINERS.md](MAINTAINERS.md) |
-| Enroll, update or pause a repository | **Actions → Manage repository** |
+| Teams, members and repository access | [peribolos.yml](peribolos.yml) |
+| Enroll, update or pause repository settings | **Actions → Manage repository** |
 | Shared protections | [defaults.yml](safe-settings/suborgs/defaults.yml) |
+| Organization Owners and invitations | GitHub organization settings |
 
-Use the form to inspect a repository or open a configuration PR. It reports
-missing rosters, CODEOWNERS and CI checks. Review and merge the PR, then run
-**Organization management → preview** before **apply**.
+Open a PR for membership changes in `peribolos.yml`, with the affected project's
+approvals required by governance. Its `members` and
+`maintainers` are GitHub team roles; both receive the team's repository access.
+Keep governance decisions in governance documents and GitHub access in this
+configuration. Repository Maintainer pages link here instead of copying rosters.
 
-**Bootstrap access** keeps `tsc-owners` eligible to approve and merge during
-setup. **Keep current** preserves the existing choice and enables it for new
-repositories. Select **Remove** only after the access handoff is approved.
-DCO, CI and review requirements still apply.
+The repository form imports existing checks, preserves their App bindings, and
+opens a PR for the native YAML changes. Merge queues retain loose checks;
+other repositories require an up-to-date branch. Existing merge queues,
+signature requirements and unrelated protections remain in place.
 
-Keep each roster in its own repository, using [MAINTAINERS.md](MAINTAINERS.md)
-as the format. The automation reads merged default-branch files. Governance
-may remain private if the App can read it; private governance is excluded from
-ruleset management on GitHub Free. Organization invitations and Owner roles
-are managed directly in GitHub.
+**Bootstrap access → Keep current** preserves the existing choice and enables
+`tsc-owners` approval/merge access for new enrollments. Select **Remove** only
+after the handoff is approved. DCO, CI and review requirements still apply.
 
 ## Running the automation
 
-The organization-owned App needs repository Administration, Contents, Checks,
-Issues and Pull requests write access; Commit statuses read access; and
-organization Members write access. Install it only on repositories it should
-manage or read. Webhooks are disabled because Actions runs the jobs.
+Install the organization-owned App on the repositories listed in `peribolos.yml`.
+It needs repository Administration, Contents, Checks, Issues and Pull requests
+write access; Commit statuses read access; and organization Members write access.
+Webhooks are disabled. Governance can remain private.
 
 | Setting | Location |
 | --- | --- |
 | `ORG_APP_ID`, `ORG_APP_CLIENT_ID` | Repository Actions variables |
 | `ORG_APP_PRIVATE_KEY` | Secret in the `org-management` environment, restricted to `main` |
 | `ORG_MANAGEMENT_ENABLED` | Repository variable; `false` stops management |
-| `ORG_AUTO_APPLY` | Repository variable; `true` applies changes on pushes and the schedule |
+| `ORG_AUTO_APPLY` | Repository variable; `true` applies on pushes and the schedule |
 
-Keep automatic apply off until preview and a manual apply have been verified.
-An apply prepares teams, applies protections, then grants repository access.
-A protection failure stops the access-grant step. Existing unrelated grants
-and protections remain.
+Run **Organization management → preview**, review the plan, then use **apply**.
+Keep automatic apply off until the first run is verified. Teams and memberships
+are reconciled first, protections next, and repository grants last. A failed
+protection step stops the grant step.
 
-[Repository configurations](safe-settings/repos) and
-[exclusions](safe-settings/deployment-settings.yml) define the managed scope.
-For App registration details, use [GitHub's documentation](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).
+Peribolos does not manage org Owners, org-wide membership, repository lifecycle,
+or direct collaborators. It preserves team names. Team deletion is disabled by
+`--maximum-removal-delta=0`; membership and grant changes follow the reviewed YAML.
+Manual changes to managed teams are reconciled to that configuration.
+
+Only repositories in [the settings scope](safe-settings/deployment-settings.yml)
+receive Safe Settings changes. [Repository configs](safe-settings/repos) can be
+prepared before enrollment. Pausing settings leaves existing access unchanged.
 
 ## Development
 
@@ -61,5 +65,4 @@ npm test
 python3 -m unittest discover -s tests -v
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Safe Settings documentation](https://github.com/github-community-projects/safe-settings).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GitHub's App documentation](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).

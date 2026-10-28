@@ -101,4 +101,6 @@ jobs:
           author: ${{ steps.prepare.outputs.author }}
           commit-message: ${{ steps.prepare.outputs.commit_message }}
           signoff: false
-          add-paths: safe-settings/
+          add-paths: |
+            safe-settings/
+            peribolos.yml

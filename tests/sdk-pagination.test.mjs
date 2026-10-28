@@ -2,7 +2,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Octokit } from "@octokit/rest";
-import { synchronize } from "../scripts/sync-rosters.mjs";
 import { observedChecks } from "../scripts/manage-repository.mjs";
 
 function client(routes) {
@@ -24,19 +23,6 @@ function client(routes) {
     },
   });
 }
-
-test("real Octokit normalizes the installation repository collection", async () => {
-  const gh = client({
-    "/installation/repositories": {
-      total_count: 1,
-      repositories: [{ name: "example" }],
-    },
-  });
-  assert.deepEqual(
-    await synchronize(gh, { repositories: {}, excluded: new Set() }),
-    { changes: 0, errors: [] },
-  );
-});
 
 test("real Octokit normalizes check-run collections", async () => {
   const gh = client({

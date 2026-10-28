@@ -1,6 +1,3 @@
-# The installation controls scope during the pilot. Once all active repos are
-# public, an all-repositories installation also covers newly created repos.
 restrictedRepos:
-  exclude:
-    - governance-archieve
-    - governance # Remove through the management form after publication.
+  include:
+    - .github

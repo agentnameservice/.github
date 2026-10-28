@@ -2,16 +2,44 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { prepare, signoff } from "../scripts/manage-repository.mjs";
-import { configuration, repositoryName } from "../scripts/config.mjs";
+import { configuration, repositoryName, access } from "../scripts/config.mjs";
 import { validate } from "../scripts/validate.mjs";
 
-const roster =
-  "## Maintainers\n| GitHub |\n| --- |\n| @alice |\n## Reviewers\n| GitHub |\n| --- |\n";
-function fake(
+function config() {
+  return {
+    repositories: {},
+    included: new Set([".github"]),
+    deployment: { restrictedRepos: { include: [".github"] } },
+    peribolos: {
+      orgs: {
+        agentnameservice: {
+          teams: {
+            "sample-maintainers": { members: ["alice"], repos: {} },
+            tsc: { members: ["bob"], repos: { governance: "write" } },
+            "tsc-owners": {
+              maintainers: ["carol", "dave"],
+              repos: { ".github": "write" },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+const inputs = () => ({
+  repository: "sample",
+  operation: "Enroll or update",
+  issue: "9",
+  signoff: "Example Person <person@example.test>",
+  certify_dco: true,
+  bootstrap_access: "Remove",
+});
+function fake({
   role = "admin",
+  queued = false,
   ci = true,
   owners = "* @agentnameservice/sample-maintainers @agentnameservice/tsc",
-) {
+} = {}) {
   return {
     rest: {
       orgs: {
@@ -29,22 +57,22 @@ function fake(
         }),
         getBranchProtection: async () => ({
           data: {
-            required_status_checks: { contexts: ci ? ["DCO", "test"] : [] },
+            required_status_checks: {
+              contexts: ci ? ["DCO", "test"] : [],
+              checks: ci ? [{ context: "test", app_id: 15368 }] : [],
+            },
           },
         }),
-        getContent: async ({ path }) => ({
-          data: {
-            type: "file",
-            encoding: "base64",
-            content: Buffer.from(
-              path === ".github/CODEOWNERS"
-                ? owners
-                : path === "TSC.md"
-                  ? "## Voting members\n| GitHub |\n| --- |\n| @tsc-member |\n"
-                  : roster,
-            ).toString("base64"),
-          },
-        }),
+        getContent: async ({ path }) => {
+          assert.equal(path, ".github/CODEOWNERS");
+          return {
+            data: {
+              type: "file",
+              encoding: "base64",
+              content: Buffer.from(owners).toString("base64"),
+            },
+          };
+        },
         listCommitStatusesForRef: "statuses",
       },
       git: {
@@ -52,256 +80,218 @@ function fake(
       },
       pulls: { list: async () => ({ data: [] }) },
       checks: { listForRef: "checks" },
+      teams: {
+        getByName: async ({ team_slug }) => ({ data: { name: team_slug } }),
+      },
       issues: { get: async () => ({ data: { number: 9 } }) },
     },
     paginate: async (route) =>
       route === "checks"
         ? [{ name: "DCO" }, { name: "test" }, { name: "build" }]
-        : [],
+        : route.startsWith("GET /repos/") && queued
+          ? [{ type: "merge_queue" }]
+          : [],
   };
 }
-const inputs = () => ({
-  repository: "sample",
-  operation: "Enroll or update",
-  issue: "9",
-  signoff: "Example Person <person@example.test>",
-  certify_dco: true,
-  bootstrap_access: "Remove",
-});
-const config = () => ({
-  repositories: {},
-  excluded: new Set(["governance-archieve"]),
-  deployment: { restrictedRepos: { exclude: ["governance-archieve"] } },
-});
+const checks = (result) => result.value.rulesets[0].rules[0].parameters;
 
-test("enrollment writes native configuration and imports existing checks", async () => {
-  const result = await prepare(fake(), config(), inputs(), "requester");
-  assert.deepEqual(result.value.teams, [
-    { name: "sample-maintainers", permission: "push" },
-    { name: "tsc", permission: "push" },
+test("enrollment writes native repository rules and Peribolos grants without changing membership", async () => {
+  const initial = config();
+  const result = await prepare(fake(), initial, inputs(), "requester");
+  assert.equal(result.value.teams, undefined);
+  assert.deepEqual(checks(result).required_status_checks, [
+    { context: "DCO" },
+    { context: "test", integration_id: 15368 },
   ]);
+  assert.equal(checks(result).strict_required_status_checks_policy, true);
+  assert.deepEqual(result.deployment.restrictedRepos.include, [
+    ".github",
+    "sample",
+  ]);
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams["sample-maintainers"].repos
+      .sample,
+    "write",
+  );
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams.tsc.repos.sample,
+    "write",
+  );
   assert.deepEqual(
-    result.value.rulesets[0].rules[0].parameters.required_status_checks.map(
-      (c) => c.context,
-    ),
-    ["test"],
+    result.peribolos.orgs.agentnameservice.teams["sample-maintainers"].members,
+    ["alice"],
   );
-  const full = await configuration();
-  full.repositories.sample = result.value;
-  validate(full);
-  result.value.rulesets[0].rules[0].parameters.required_status_checks.push({
-    context: "DCO",
-  });
-  assert.throws(() => validate(full), /additional/);
-});
-
-test("Reviewer teams are created only for nonempty rosters and retained when explicitly configured", async () => {
-  const empty = await prepare(fake(), config(), inputs(), "requester");
-  assert.ok(!empty.value.teams.some((t) => t.name.endsWith("-reviewers")));
-  const gh = fake();
-  const content = gh.rest.repos.getContent;
-  gh.rest.repos.getContent = async (args) => {
-    const response = await content(args);
-    if (args.repo === "sample" && args.path === "MAINTAINERS.md")
-      response.data.content = Buffer.from(roster + "| @bob |\n").toString(
-        "base64",
-      );
-    return response;
-  };
-  const populated = await prepare(gh, config(), inputs(), "requester");
-  assert.ok(populated.value.teams.some((t) => t.name === "sample-reviewers"));
-  const existing = config();
-  existing.repositories.sample = populated.value;
-  const retained = await prepare(fake(), existing, inputs(), "requester");
-  assert.ok(retained.value.teams.some((t) => t.name === "sample-reviewers"));
-});
-
-test("a new package repository reuses the source's actual Reviewer team", async () => {
-  for (const hasReviewers of [false, true]) {
-    const sdkGh = fake();
-    const sdkContent = sdkGh.rest.repos.getContent;
-    sdkGh.rest.repos.getContent = async (args) => {
-      const response = await sdkContent(args);
-      if (
-        args.repo === "sample" &&
-        args.path === "MAINTAINERS.md" &&
-        hasReviewers
-      )
-        response.data.content = Buffer.from(roster + "| @bob |\n").toString(
-          "base64",
-        );
-      return response;
-    };
-    const { value } = await prepare(sdkGh, config(), inputs(), "requester");
-    if (hasReviewers)
-      value.teams.find((t) => t.name === "sample-reviewers").name =
-        "sdk-review-team";
-    const current = config();
-    current.repositories.sample = value;
-    const gh = fake();
-    const original = gh.rest.repos.getContent;
-    gh.rest.repos.getContent = async (args) => {
-      const response = await original(args);
-      if (args.repo === "tap" && args.path === "MAINTAINERS.md")
-        response.data.content = Buffer.from(
-          "Roster source: agentnameservice/sample/MAINTAINERS.md\n",
-        ).toString("base64");
-      if (
-        args.repo === "sample" &&
-        args.path === "MAINTAINERS.md" &&
-        hasReviewers
-      )
-        response.data.content = Buffer.from(roster + "| @bob |\n").toString(
-          "base64",
-        );
-      return response;
-    };
-    const result = await prepare(
-      gh,
-      current,
-      { ...inputs(), repository: "tap" },
-      "requester",
-    );
-    assert.deepEqual(result.value.teams, value.teams);
-  }
-});
-
-test("a shared roster cannot enroll under a different Maintainer team", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  const current = config();
-  current.repositories.sample = value;
-  const gh = fake(
-    "admin",
-    true,
-    "* @agentnameservice/other-maintainers @agentnameservice/tsc",
-  );
-  const original = gh.rest.repos.getContent;
-  gh.rest.repos.getContent = async (args) => {
-    const response = await original(args);
-    if (args.repo === "tap" && args.path === "MAINTAINERS.md")
-      response.data.content = Buffer.from(
-        "Roster source: agentnameservice/sample/MAINTAINERS.md\n",
-      ).toString("base64");
-    return response;
-  };
-  await assert.rejects(
-    prepare(gh, current, { ...inputs(), repository: "tap" }, "requester"),
-    /same Maintainer team/,
+  assert.deepEqual(
+    initial.peribolos.orgs.agentnameservice.teams["sample-maintainers"].repos,
+    {},
   );
 });
 
-test("an existing package configuration can adopt Reviewers added to its source", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  const current = config();
-  current.repositories.sample = structuredClone(value);
-  current.repositories.tap = structuredClone(value);
-  current.repositories.sample.teams.push({
-    name: "sdk-review-team",
-    permission: "push",
-  });
-  const gh = fake();
-  const original = gh.rest.repos.getContent;
-  gh.rest.repos.getContent = async (args) => {
-    const response = await original(args);
-    if (args.path === "MAINTAINERS.md")
-      response.data.content = Buffer.from(
-        args.repo === "tap"
-          ? "Roster source: agentnameservice/sample/MAINTAINERS.md\n"
-          : roster + "| @bob |\n",
-      ).toString("base64");
-    return response;
-  };
+test("merge queues retain loose checks while non-queued repositories stay strict", async () => {
   const result = await prepare(
-    gh,
-    current,
-    { ...inputs(), repository: "tap" },
+    fake({ queued: true }),
+    config(),
+    inputs(),
     "requester",
   );
-  assert.ok(result.value.teams.some((t) => t.name === "sdk-review-team"));
+  assert.equal(checks(result).strict_required_status_checks_policy, false);
+  assert.deepEqual(
+    checks(result).required_status_checks.find((c) => c.context === "DCO"),
+    { context: "DCO" },
+  );
 });
 
-test("updates retain configured App bindings despite unbound live contexts", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  value.rulesets[0].rules[0].parameters.required_status_checks = [
-    { context: "test", integration_id: 15368 },
-  ];
-  const current = config();
-  current.repositories.sample = value;
-  for (const required_checks of [undefined, "test;build"]) {
+test("a newly selected DCO requirement uses the App except on merge queues", async () => {
+  for (const queued of [false, true]) {
     const result = await prepare(
-      fake(),
-      current,
-      { ...inputs(), required_checks },
+      fake({ ci: false, queued }),
+      config(),
+      { ...inputs(), required_checks: "build" },
       "requester",
     );
-    const checks =
-      result.value.rulesets[0].rules[0].parameters.required_status_checks;
     assert.deepEqual(
-      checks.find((c) => c.context === "test"),
-      { context: "test", integration_id: 15368 },
+      checks(result).required_status_checks.find((c) => c.context === "DCO"),
+      queued ? { context: "DCO" } : { context: "DCO", integration_id: 1861 },
     );
-    if (required_checks)
-      assert.deepEqual(
-        checks.find((c) => c.context === "build"),
-        { context: "build" },
-      );
   }
 });
 
-test("imports preserve classic and ruleset App bindings without duplicate checks", async () => {
+test("updating existing config preserves check App bindings and accepts added checks", async () => {
+  const first = await prepare(fake(), config(), inputs(), "requester");
+  const current = config();
+  current.repositories.sample = first.value;
+  const result = await prepare(
+    fake(),
+    current,
+    { ...inputs(), required_checks: "test;build" },
+    "requester",
+  );
+  assert.deepEqual(checks(result).required_status_checks, [
+    { context: "DCO" },
+    { context: "build" },
+    { context: "test", integration_id: 15368 },
+  ]);
+});
+
+test("conflicting check bindings fail instead of dropping an App restriction", async () => {
   const gh = fake();
-  gh.rest.repos.getBranchProtection = async () => ({
-    data: {
-      required_status_checks: {
-        contexts: ["DCO", "test"],
-        checks: [{ context: "test", app_id: 15368 }],
-      },
-    },
-  });
-  const paginate = gh.paginate;
+  const old = gh.paginate;
   gh.paginate = async (route, args) =>
     route.startsWith("GET /repos/")
       ? [
           {
             type: "required_status_checks",
             parameters: {
-              required_status_checks: [
-                { context: "test", integration_id: 15368 },
-                { context: "build", integration_id: 42 },
-              ],
+              required_status_checks: [{ context: "test", integration_id: 42 }],
             },
           },
         ]
-      : paginate(route, args);
-  const result = await prepare(gh, config(), inputs(), "requester");
-  assert.deepEqual(
-    result.value.rulesets[0].rules[0].parameters.required_status_checks,
-    [
-      { context: "build", integration_id: 42 },
-      { context: "test", integration_id: 15368 },
-    ],
+      : old(route, args);
+  await assert.rejects(
+    prepare(gh, config(), inputs(), "requester"),
+    /Conflicting App bindings/,
   );
 });
 
-test("conflicting App bindings are reported instead of silently choosing one", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  value.rulesets[0].rules[0].parameters.required_status_checks = [
-    { context: "test", integration_id: 15368 },
-  ];
-  const current = config();
-  current.repositories.sample = value;
-  const gh = fake();
-  gh.rest.repos.getBranchProtection = async () => ({
-    data: {
-      required_status_checks: { checks: [{ context: "test", app_id: 42 }] },
-    },
-  });
-  await assert.rejects(
-    prepare(gh, current, inputs(), "requester"),
-    /Conflicting App bindings for test/,
+test("bootstrap grants preserve both administrators and apply only to PR merge restrictions", async () => {
+  const result = await prepare(
+    fake({
+      owners:
+        "* @agentnameservice/sample-maintainers @agentnameservice/tsc @agentnameservice/tsc-owners",
+    }),
+    config(),
+    { ...inputs(), bootstrap_access: "Keep current" },
+    "requester",
+  );
+  assert.deepEqual(
+    result.value.rulesets[1].bypass_actors.map((a) => [a.name, a.bypass_mode]),
+    [
+      ["sample-maintainers", "pull_request"],
+      ["tsc-owners", "pull_request"],
+    ],
+  );
+  assert.deepEqual(result.value.rulesets[0].bypass_actors, []);
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams["tsc-owners"].repos.sample,
+    "write",
+  );
+  assert.deepEqual(
+    result.peribolos.orgs.agentnameservice.teams["tsc-owners"].maintainers,
+    ["carol", "dave"],
   );
 });
-test("inspection does not require a signoff or issue", async () => {
+
+test("removing bootstrap access preserves the administrators' other grants", async () => {
+  const initial = config();
+  initial.peribolos.orgs.agentnameservice.teams["tsc-owners"].repos.sample =
+    "write";
+  const result = await prepare(fake(), initial, inputs(), "requester");
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams["tsc-owners"].repos.sample,
+    undefined,
+  );
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams["tsc-owners"].repos[".github"],
+    "write",
+  );
+});
+
+test("the form uses existing display names rather than renaming teams", async () => {
+  const initial = config();
+  initial.peribolos.orgs.agentnameservice.teams["Sample Maintainers"] =
+    initial.peribolos.orgs.agentnameservice.teams["sample-maintainers"];
+  delete initial.peribolos.orgs.agentnameservice.teams["sample-maintainers"];
+  const gh = fake();
+  gh.rest.teams.getByName = async ({ team_slug }) => ({
+    data: {
+      name:
+        team_slug === "sample-maintainers" ? "Sample Maintainers" : team_slug,
+    },
+  });
+  const result = await prepare(gh, initial, inputs(), "requester");
+  assert.equal(
+    result.peribolos.orgs.agentnameservice.teams["Sample Maintainers"].repos
+      .sample,
+    "write",
+  );
+});
+
+test("missing team configuration and path ownership stop enrollment", async () => {
+  const missing = config();
+  delete missing.peribolos.orgs.agentnameservice.teams.tsc;
+  await assert.rejects(
+    prepare(fake(), missing, inputs(), "requester"),
+    /Declare team tsc/,
+  );
+  await assert.rejects(
+    prepare(
+      fake({
+        owners:
+          "* @agentnameservice/sample-maintainers @agentnameservice/tsc\n/src/ @agentnameservice/sample-maintainers",
+      }),
+      config(),
+      inputs(),
+      "requester",
+    ),
+    /path-specific/,
+  );
+});
+
+test("pause changes only settings scope and leaves team access alone", async () => {
+  const initial = config();
+  initial.included.add("sample");
+  initial.deployment.restrictedRepos.include.push("sample");
+  const result = await prepare(
+    fake(),
+    initial,
+    { ...inputs(), operation: "Pause management" },
+    "requester",
+  );
+  assert.deepEqual(result.deployment.restrictedRepos.include, [".github"]);
+  assert.deepEqual(result.peribolos, initial.peribolos);
+});
+
+test("inspection is read-only and publication requires owner authority and DCO", async () => {
   const result = await prepare(
     fake(),
     config(),
@@ -313,291 +303,50 @@ test("inspection does not require a signoff or issue", async () => {
     "requester",
   );
   assert.equal(result.signoff, undefined);
-  assert.deepEqual(result.pending, []);
-});
-test("only organization owners can request changes", async () => {
   await assert.rejects(
-    prepare(fake("member"), config(), inputs(), "requester"),
+    prepare(fake({ role: "member" }), config(), inputs(), "requester"),
     /owner/,
   );
-});
-test("DCO is explicit, not invented or silently certified", () => {
   for (const value of [
     {},
     { certify_dco: true, signoff: "bot" },
-    {
-      certify_dco: true,
-      signoff: "Name <a@example.test>\nSigned-off-by: Other <x@example.test>",
-    },
+    { certify_dco: true, signoff: "Name <a@example.test>\nOther" },
   ])
     assert.throws(() => signoff(value));
   assert.equal(signoff(inputs()), inputs().signoff);
 });
-test("first CI choice must be supplied rather than guessed", async () => {
+
+test("unknown checks and excluded/foreign names cannot be enrolled", async () => {
   await assert.rejects(
-    prepare(fake("admin", false), config(), inputs(), "requester"),
+    prepare(fake({ ci: false }), config(), inputs(), "requester"),
     /Select the actual CI/,
   );
-  const result = await prepare(
-    fake("admin", false),
-    config(),
-    { ...inputs(), required_checks: "build" },
-    "requester",
-  );
-  assert.deepEqual(
-    result.value.rulesets[0].rules[0].parameters.required_status_checks.map(
-      (c) => c.context,
+  await assert.rejects(
+    prepare(
+      fake(),
+      config(),
+      { ...inputs(), required_checks: "never-ran" },
+      "requester",
     ),
-    ["build"],
+    /representative PR/,
   );
-});
-test("an explicit check update supports a renamed CI job through a reviewed diff", async () => {
-  const result = await prepare(
-    fake(),
-    config(),
-    { ...inputs(), required_checks: "build" },
-    "requester",
-  );
-  assert.deepEqual(
-    result.value.rulesets[0].rules[0].parameters.required_status_checks.map(
-      (c) => c.context,
-    ),
-    ["build"],
-  );
-});
-test("archive and cross-organization paths are rejected", () => {
-  for (const value of ["governance-archieve", "../repo", "other/repo", "*"])
-    assert.throws(() => repositoryName(value));
-});
-test("initial configuration manages only .github through tsc-owners", async () => {
-  const initial = await configuration();
-  validate(initial);
-  assert.deepEqual(Object.keys(initial.repositories), [".github"]);
-  assert.deepEqual(initial.repositories[".github"].teams, [
-    { name: "tsc-owners", permission: "push" },
-  ]);
+  for (const name of ["../repo", "other/repo", "governance-archieve", "*"])
+    assert.throws(() => repositoryName(name));
 });
 
-test("TSC reviews do not grant merge or protection bypass rights", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  const full = await configuration();
-  full.repositories.sample = value;
-  validate(full);
-  assert.deepEqual(value.rulesets[1].bypass_actors, [
-    {
-      actor_type: "Team",
-      name: "sample-maintainers",
-      bypass_mode: "pull_request",
-    },
+test("checked-in scope starts with .github; ans preserves its real queued CI", async () => {
+  const actual = await configuration();
+  validate(actual);
+  assert.deepEqual([...actual.included], [".github"]);
+  const ans = actual.repositories.ans.rulesets[0].rules[0].parameters;
+  assert.equal(ans.strict_required_status_checks_policy, false);
+  assert.deepEqual(ans.required_status_checks, [
+    { context: "DCO" },
+    { context: "Build & Test", integration_id: 15368 },
+    { context: "Lint", integration_id: 15368 },
   ]);
-  assert.deepEqual(value.rulesets[0].bypass_actors, []);
-  assert.deepEqual(full.defaults.rulesets[0].bypass_actors, []);
-  value.rulesets[1].bypass_actors[0].name = "tsc";
-  assert.throws(() => validate(full), /does not confer project merge/);
-});
-
-test("CODEOWNERS recognizes either team order and checks the effective catch-all", async () => {
-  const result = await prepare(
-    fake(
-      "admin",
-      true,
-      "* @agentnameservice/old-maintainers @agentnameservice/tsc\n* @agentnameservice/tsc @agentnameservice/sample-maintainers # fallback",
-    ),
-    config(),
-    inputs(),
-    "requester",
-  );
   assert.equal(
-    result.value.rulesets[1].bypass_actors[0].name,
-    "sample-maintainers",
+    access(".github", actual.repositories[".github"]).maintainers,
+    "tsc-owners",
   );
-  await assert.rejects(
-    prepare(
-      fake(
-        "admin",
-        true,
-        "* @agentnameservice/sample-maintainers @agentnameservice/tsc\n* @agentnameservice/sample-maintainers",
-      ),
-      config(),
-      inputs(),
-      "requester",
-    ),
-    /Merge CODEOWNERS/,
-  );
-});
-
-test("path-specific CODEOWNERS cannot silently remove the TSC fallback", async () => {
-  await assert.rejects(
-    prepare(
-      fake(
-        "admin",
-        true,
-        "* @agentnameservice/sample-maintainers @agentnameservice/tsc\n/src/ @agentnameservice/sample-reviewers",
-      ),
-      config(),
-      inputs(),
-      "requester",
-    ),
-    /path-specific/,
-  );
-});
-
-test("enrollment requires the published TSC source before granting its access", async () => {
-  const gh = fake();
-  const original = gh.rest.repos.getContent;
-  gh.rest.repos.getContent = async (args) => {
-    if (args.path === "TSC.md")
-      throw Object.assign(new Error("missing"), { status: 404 });
-    return original(args);
-  };
-  await assert.rejects(
-    prepare(gh, config(), inputs(), "requester"),
-    /governance: merge its approved roster into the default branch first/,
-  );
-});
-
-test("private governance can supply the TSC roster without becoming a managed private repo", async () => {
-  const gh = fake();
-  const original = gh.rest.repos.get;
-  gh.rest.repos.get = async (args) => {
-    const response = await original(args);
-    response.data.private = args.repo === "governance";
-    return response;
-  };
-  const result = await prepare(gh, config(), inputs(), "requester");
-  assert.deepEqual(result.pending, []);
-  await assert.rejects(
-    prepare(
-      gh,
-      config(),
-      { ...inputs(), repository: "governance" },
-      "requester",
-    ),
-    /must be public/,
-  );
-});
-
-test("new repositories retain bootstrap approval and PR-only merge access by default", async () => {
-  const gh = fake(
-    "admin",
-    true,
-    "* @agentnameservice/sample-maintainers @agentnameservice/tsc @agentnameservice/tsc-owners",
-  );
-  const request = { ...inputs() };
-  delete request.bootstrap_access;
-  const { value } = await prepare(gh, config(), request, "requester");
-  assert.deepEqual(
-    value.rulesets[1].bypass_actors.map((a) => [a.name, a.bypass_mode]),
-    [
-      ["sample-maintainers", "pull_request"],
-      ["tsc-owners", "pull_request"],
-    ],
-  );
-  assert.ok(
-    value.teams.some((t) => t.name === "tsc-owners" && t.permission === "push"),
-  );
-  const full = await configuration();
-  full.repositories.sample = value;
-  validate(full);
-  assert.deepEqual(value.rulesets[0].bypass_actors, []);
-  value.rulesets[1].bypass_actors[1].bypass_mode = "always";
-  assert.throws(() => validate(full), /through PRs/);
-});
-
-test("bootstrap handoff stays removed on subsequent updates", async () => {
-  const { value } = await prepare(fake(), config(), inputs(), "requester");
-  const current = config();
-  current.repositories.sample = value;
-  const result = await prepare(
-    fake(),
-    current,
-    { ...inputs(), bootstrap_access: "Keep current" },
-    "requester",
-  );
-  assert.deepEqual(
-    result.value.rulesets[1].bypass_actors.map((a) => a.name),
-    ["sample-maintainers"],
-  );
-});
-
-test("bootstrap CODEOWNERS cannot be omitted on path-specific rules", async () => {
-  await assert.rejects(
-    prepare(
-      fake(
-        "admin",
-        true,
-        "* @agentnameservice/sample-maintainers @agentnameservice/tsc @agentnameservice/tsc-owners\n/private/ @agentnameservice/tsc",
-      ),
-      config(),
-      { ...inputs(), bootstrap_access: "Enable" },
-      "requester",
-    ),
-    /tsc-owners on every CODEOWNERS/,
-  );
-});
-
-test("initial .github enrollment does not depend on any TSC roster", async () => {
-  const gh = fake("admin", true, "* @agentnameservice/tsc-owners");
-  const original = gh.rest.repos.get;
-  gh.rest.repos.get = async (args) => {
-    assert.equal(
-      args.repo,
-      ".github",
-      "No governance read is needed for the owners-only initial configuration",
-    );
-    return original(args);
-  };
-  const { value } = await prepare(
-    gh,
-    config(),
-    { ...inputs(), repository: ".github" },
-    "requester",
-  );
-  assert.deepEqual(value.teams, [{ name: "tsc-owners", permission: "push" }]);
-  const full = await configuration();
-  full.repositories[".github"] = value;
-  validate(full);
-});
-
-test("governance and .github retain their distinct merge authorities", async () => {
-  for (const [repository, team] of [
-    ["governance", "tsc"],
-    [".github", "tsc-owners"],
-  ]) {
-    const gh = fake(
-      "admin",
-      true,
-      "* " +
-        [...new Set([team, "tsc"])]
-          .map((t) => "@agentnameservice/" + t)
-          .join(" "),
-    );
-    const original = gh.rest.repos.getContent;
-    gh.rest.repos.getContent = async (args) =>
-      args.path === "TSC.md"
-        ? {
-            data: {
-              type: "file",
-              encoding: "base64",
-              content: Buffer.from(
-                "## Voting members\n| GitHub |\n| --- |\n| @alice |\n",
-              ).toString("base64"),
-            },
-          }
-        : original(args);
-    const { value } = await prepare(
-      gh,
-      config(),
-      { ...inputs(), repository },
-      "requester",
-    );
-    const full = await configuration();
-    full.repositories[repository] = value;
-    validate(full);
-    assert.deepEqual(
-      value.rulesets[1].bypass_actors.map((a) => a.name),
-      [team],
-    );
-    assert.equal(value.teams.filter((t) => t.name === "tsc").length, 1);
-  }
 });

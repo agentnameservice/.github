@@ -1,7 +1,3 @@
-# Initial management scope. Other repositories enroll through the Actions form.
-teams:
-  - name: tsc-owners
-    permission: push
 rulesets:
   - name: ANS repository checks
     target: branch
@@ -16,6 +12,8 @@ rulesets:
         parameters:
           strict_required_status_checks_policy: true
           required_status_checks:
+            - context: DCO
+              integration_id: 1861
             - context: Validate organization configuration
               integration_id: 15368
   - name: ANS Maintainer merges

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// A small form adapter: read GitHub, then edit native Safe Settings YAML for a PR.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -13,7 +12,6 @@ import {
   TSC,
   BOOTSTRAP,
   access,
-  codeOwners,
   configuration,
   ensure,
   repositoryName,
@@ -28,7 +26,6 @@ import {
   textFile,
   trustedWorkflow,
 } from "./github.mjs";
-import { roster } from "./rosters.mjs";
 
 export function signoff(inputs) {
   ensure(
@@ -92,19 +89,13 @@ export async function prepare(gh, config, inputs, actor) {
   const info = await publicRepository(gh, name);
   const value = structuredClone(config.repositories[name] || {});
   const deployment = structuredClone(config.deployment);
+  const peribolos = structuredClone(config.peribolos);
   let observed = [];
   const pending = [];
-  let affected = [name];
   if (inputs.operation === "Pause management") {
-    if (config.repositories[name]) {
-      const team = access(name, value).maintainers;
-      affected = Object.entries(config.repositories)
-        .filter(([n, c]) => access(n, c).maintainers === team)
-        .map(([n]) => n);
-    }
-    deployment.restrictedRepos.exclude = [
-      ...new Set([...config.excluded, ...affected]),
-    ].sort();
+    deployment.restrictedRepos.include = [...config.included].filter(
+      (repo) => repo !== name,
+    );
   } else {
     const sha = await head(gh, name, info.default_branch);
     const existing =
@@ -153,40 +144,7 @@ export async function prepare(gh, config, inputs, actor) {
       (bootstrapChoice === "Enable" ||
         (bootstrapChoice === "Keep current" &&
           (config.repositories[name] ? mapping.bootstrap : true)));
-    const includeTsc =
-      name !== REPO ||
-      value.teams?.some((t) => t.name === TSC) ||
-      catchall?.includes(`@${ORG}/${TSC}`);
-    try {
-      const people = await roster(gh, name, config.repositories);
-      if (people.source !== name) {
-        const shared = access(
-          people.source,
-          config.repositories[people.source],
-        );
-        ensure(
-          mapping.maintainers === shared.maintainers,
-          "Shared rosters must use the same Maintainer team",
-        );
-        ensure(
-          shared.reviewers || !people.reviewers.length,
-          "Configure the source repository's Reviewer team first",
-        );
-        mapping.reviewers = shared.reviewers;
-      } else if (
-        people.reviewers.length &&
-        !mapping.reviewers &&
-        ![REPO, "governance"].includes(name)
-      ) {
-        mapping.reviewers =
-          mapping.maintainers.replace(/-maintainers$/, "") + "-reviewers";
-      }
-      if (includeTsc && name !== "governance")
-        await roster(gh, "governance", config.repositories);
-      if (mapping.bootstrap) await roster(gh, REPO, config.repositories);
-    } catch (error) {
-      pending.push(error.message);
-    }
+    const includeTsc = name !== REPO || catchall?.includes(`@${ORG}/${TSC}`);
     const previous =
       value.rulesets
         ?.find((r) => r.name === CHECKS)
@@ -208,7 +166,6 @@ export async function prepare(gh, config, inputs, actor) {
         .filter((r) => r.type === "required_status_checks")
         .flatMap((r) => r.parameters.required_status_checks),
     ]) {
-      if (check.context === "DCO") continue;
       const current = required.get(check.context);
       ensure(
         current?.integration_id == null ||
@@ -232,16 +189,9 @@ export async function prepare(gh, config, inputs, actor) {
         )
       : new Set(required.keys());
     selected.add("DCO");
-    value.teams = [
-      ...new Set(
-        [
-          mapping.maintainers,
-          mapping.reviewers,
-          ...(includeTsc ? [TSC] : []),
-          ...(mapping.bootstrap ? [BOOTSTRAP] : []),
-        ].filter(Boolean),
-      ),
-    ].map((team) => ({ name: team, permission: "push" }));
+    const queued = rules.some((rule) => rule.type === "merge_queue");
+    if (!queued && !required.has("DCO"))
+      required.set("DCO", { context: "DCO", integration_id: 1861 });
     const common = {
       target: "branch",
       enforcement: "active",
@@ -259,9 +209,8 @@ export async function prepare(gh, config, inputs, actor) {
           {
             type: "required_status_checks",
             parameters: {
-              strict_required_status_checks_policy: true,
+              strict_required_status_checks_policy: !queued,
               required_status_checks: [...selected]
-                .filter((c) => c !== "DCO")
                 .sort()
                 .map((context) => required.get(context) || { context }),
             },
@@ -283,9 +232,34 @@ export async function prepare(gh, config, inputs, actor) {
         rules: [{ type: "update" }],
       },
     ];
-    const requiredOwners = codeOwners(name, value).map(
-      (team) => `@${ORG}/${team}`,
-    );
+    const ownerTeams = [
+      ...new Set([
+        mapping.maintainers,
+        ...(includeTsc ? [TSC] : []),
+        ...(mapping.bootstrap ? [BOOTSTRAP] : []),
+      ]),
+    ];
+    const requiredOwners = ownerTeams.map((team) => `@${ORG}/${team}`);
+    for (const slug of [
+      ...new Set([
+        ...ownerTeams,
+        ...(bootstrapChoice === "Remove" && name !== REPO ? [BOOTSTRAP] : []),
+      ]),
+    ]) {
+      const team = await optional(() =>
+        gh.rest.teams.getByName({ org: ORG, team_slug: slug }),
+      );
+      const desired = team && peribolos.orgs[ORG].teams[team.data.name];
+      if (!desired) {
+        pending.push(
+          `Declare team ${slug} in peribolos.yml and apply its team setup first.`,
+        );
+        continue;
+      }
+      desired.repos ||= {};
+      if (ownerTeams.includes(slug)) desired.repos[name] = "write";
+      else delete desired.repos[name];
+    }
     if (
       JSON.stringify([...(catchall?.slice(1) || [])].sort()) !==
       JSON.stringify([...requiredOwners].sort())
@@ -307,17 +281,17 @@ export async function prepare(gh, config, inputs, actor) {
       pending.push(
         "Run the selected checks on a representative PR before enrolling.",
       );
-    deployment.restrictedRepos.exclude = [...config.excluded].filter(
-      (n) => n !== name,
-    );
+    deployment.restrictedRepos.include = [
+      ...new Set([...config.included, name]),
+    ].sort();
   }
   const result = {
     name,
     value,
     deployment,
+    peribolos,
     observed,
     pending,
-    affected,
     operation: inputs.operation,
   };
   result.report = `# ${name}\n\n${inputs.operation}.\n\n`;
@@ -329,9 +303,6 @@ export async function prepare(gh, config, inputs, actor) {
   if (pending.length)
     result.report +=
       "\nSetup needed:\n" + pending.map((p) => "- " + p).join("\n") + "\n";
-  if (affected.length > 1)
-    result.report +=
-      "\nShared-team repositories affected: " + affected.join(", ") + ".\n";
   if (inputs.operation !== "Inspect repository") {
     ensure(!pending.length, result.report);
     result.signoff = signoff(inputs);
@@ -388,7 +359,8 @@ async function main() {
   const changed =
     result.operation !== "Inspect repository" &&
     (updateRepo ||
-      JSON.stringify(config.deployment) !== JSON.stringify(result.deployment));
+      JSON.stringify(config.deployment) !== JSON.stringify(result.deployment) ||
+      JSON.stringify(config.peribolos) !== JSON.stringify(result.peribolos));
   await output("changed", String(changed));
   if (!changed) return;
   if (updateRepo)
@@ -401,6 +373,8 @@ async function main() {
       path.join(ROOT, "safe-settings/deployment-settings.yml"),
       result.deployment,
     );
+  if (JSON.stringify(config.peribolos) !== JSON.stringify(result.peribolos))
+    await writeYaml(path.join(ROOT, "peribolos.yml"), result.peribolos);
   const title = `chore: configure ${result.name}`;
   await output("title", title);
   await output("branch", "codex/manage-" + result.name.replaceAll(".", "-"));
@@ -412,7 +386,7 @@ async function main() {
   await fs.mkdir(path.join(ROOT, "reports"), { recursive: true });
   await fs.writeFile(
     path.join(ROOT, "reports/request.md"),
-    `## Related issue\n\nFixes #${result.issue}\n\n## Summary\n\n${result.report}\nThe declared teams follow the reviewed repository rosters, including removals. Review this configuration change before merging.\n\n## Testing\n\nNative configuration validation runs in CI.\n\n## AI assistance\n\nNo AI is used by this deterministic workflow.\n`,
+    `## Related issue\n\nFixes #${result.issue}\n\n## Summary\n\n${result.report}\nTeam access is declared in peribolos.yml. Review this configuration change before merging.\n\n## Testing\n\nNative configuration validation runs in CI.\n\n## AI assistance\n\nNo AI is used by this deterministic workflow.\n`,
   );
 }
 if (

@@ -40,68 +40,33 @@ export async function writeYaml(file, value) {
 }
 export function access(name, config) {
   repositoryName(name);
-  const gate = config.rulesets?.find((r) => r.name === MERGE);
-  const mergers = gate?.bypass_actors
-    ?.filter((a) => a.actor_type === "Team")
-    .map((a) => a.name);
-  const teams = config.teams || [];
-  const bootstrap = name !== REPO && mergers?.includes(BOOTSTRAP);
-  const maintainers = mergers?.filter(
-    (team) => name === REPO || team !== BOOTSTRAP,
-  );
+  const actors =
+    config.rulesets?.find((r) => r.name === MERGE)?.bypass_actors || [];
   ensure(
-    maintainers?.length === 1 &&
-      new Set(mergers).size === mergers.length &&
-      teams.length >= 1 &&
-      teams.length <= 4,
-    `${name}: declare one merge team, optional bootstrap access, and at most one Reviewer team`,
+    actors.every(
+      (a) =>
+        a.actor_type === "Team" &&
+        a.bypass_mode === "pull_request" &&
+        teamPattern.test(a.name),
+    ),
+    `${name}: merge access must use named teams through PRs`,
   );
+  const mergers = actors.map((a) => a.name);
+  const bootstrap = name !== REPO && mergers.includes(BOOTSTRAP);
+  const primary = mergers.filter((team) => name === REPO || team !== BOOTSTRAP);
   ensure(
-    teams.every((t) => teamPattern.test(t.name) && t.permission === "push"),
-    `${name}: roster teams need Write permission`,
-  );
-  ensure(
-    new Set(teams.map((t) => t.name)).size === teams.length &&
-      teams.some((t) => t.name === maintainers[0]) &&
-      (name === REPO || teams.some((t) => t.name === TSC)) &&
-      (!bootstrap || teams.some((t) => t.name === BOOTSTRAP)),
-    `${name}: ambiguous team mapping`,
+    primary.length === 1 && new Set(mergers).size === mergers.length,
+    `${name}: declare one Maintainer team and optional bootstrap access`,
   );
   ensure(
     name === "governance"
-      ? maintainers[0] === TSC
-      : name === ".github"
-        ? maintainers[0] === BOOTSTRAP
-        : ![TSC, BOOTSTRAP].includes(maintainers[0]),
-    `${name}: TSC review access does not confer project merge authority`,
+      ? primary[0] === TSC
+      : name === REPO
+        ? primary[0] === BOOTSTRAP
+        : ![TSC, BOOTSTRAP].includes(primary[0]),
+    `${name}: use the repository's merge team`,
   );
-  const reviewers = teams.filter(
-    (t) =>
-      t.name !== maintainers[0] &&
-      t.name !== TSC &&
-      !(bootstrap && t.name === BOOTSTRAP),
-  );
-  ensure(reviewers.length <= 1, `${name}: declare at most one Reviewer team`);
-  ensure(
-    !reviewers.some((t) => t.name === "tsc-owners") &&
-      (![".github", "governance"].includes(name) || !reviewers.length),
-    `${name}: keep officer and TSC membership in their governance rosters`,
-  );
-  return {
-    maintainers: maintainers[0],
-    reviewers: reviewers[0]?.name,
-    bootstrap: Boolean(bootstrap),
-  };
-}
-export function codeOwners(name, settings) {
-  const mapping = access(name, settings);
-  return [
-    ...new Set([
-      mapping.maintainers,
-      ...(settings.teams.some((t) => t.name === TSC) ? [TSC] : []),
-      ...(mapping.bootstrap ? [BOOTSTRAP] : []),
-    ]),
-  ];
+  return { maintainers: primary[0], bootstrap };
 }
 export async function configuration(root = ROOT) {
   const settings = await readYaml(
@@ -113,14 +78,16 @@ export async function configuration(root = ROOT) {
   const deployment = await readYaml(
     path.join(root, "safe-settings/deployment-settings.yml"),
   );
-  const excluded = deployment.restrictedRepos?.exclude;
+  const included = deployment.restrictedRepos?.include;
   ensure(
-    Array.isArray(excluded) && excluded.includes("governance-archieve"),
-    "Keep the archive excluded",
+    Array.isArray(included) && included.every((n) => repositoryName(n) === n),
+    "Explicitly include only repositories ready for settings management",
   );
+  const peribolos = await readYaml(path.join(root, "peribolos.yml"));
   ensure(
-    excluded.every((n) => n === "governance-archieve" || repositoryName(n)),
-    "Use explicit exclusions",
+    Object.keys(peribolos.orgs || {}).join() === ORG &&
+      Object.keys(peribolos.orgs[ORG]).join() === "teams",
+    "Peribolos manages only ANS teams; org settings and Owners stay in GitHub",
   );
   const directory = path.join(root, "safe-settings/repos");
   const repositories = Object.create(null);
@@ -136,7 +103,8 @@ export async function configuration(root = ROOT) {
     settings,
     defaults,
     deployment,
-    excluded: new Set(excluded),
+    included: new Set(included),
+    peribolos,
     repositories,
   };
 }

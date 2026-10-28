@@ -1,0 +1,133 @@
+orgs:
+  agentnameservice:
+    teams:
+      Maintainers:
+        privacy: closed
+        description: ''
+        maintainers:
+          - csnitker-godaddy
+        members:
+          - bchen-godaddy
+          - chou-godaddy
+          - jcrisp-godaddy
+          - jhateley-godaddy
+        repos:
+          agent-trust-discovery: maintain
+          ans-gateway-auth: maintain
+          ans-openshell: maintain
+          ans-sdk-go: maintain
+          trust-index-spec: maintain
+      Reviewers:
+        privacy: closed
+        description: ''
+        maintainers:
+          - kperry-godaddy
+        members: []
+        repos: {}
+      ans-gateway-auth-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members: []
+        repos:
+          ans-gateway-auth: write
+      ans-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members:
+          - jhateley-godaddy
+        repos:
+          ans: write
+      ans-openshell-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members: []
+        repos:
+          ans-openshell: write
+      sdk-go-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members: []
+        repos:
+          ans-sdk-go: write
+          homebrew-ans: write
+          scoop-ans: write
+      sdk-java-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - kperry-godaddy
+        members:
+          - jhateley-godaddy
+        repos:
+          ans-sdk-java: write
+      sdk-rust-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members: []
+        repos:
+          ans-sdk-rust: write
+      spec-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+          - scourtney-godaddy
+        members: []
+        repos:
+          ans-registry: write
+      trust-index-spec-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members:
+          - cyen-godaddy
+        repos:
+          trust-index-spec: write
+      trust-maintainers:
+        privacy: closed
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - kperry-godaddy
+        members:
+          - cyen-godaddy
+        repos:
+          agent-trust-discovery: write
+      tsc:
+        privacy: closed
+        description: 'ANS governance roster: TSC voting members'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+          - scourtney-godaddy
+        members:
+          - kantorcodes
+          - kenhuangus
+        repos:
+          governance: write
+      tsc-owners:
+        privacy: closed
+        description: Organization configuration administrators
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members: []
+        repos:
+          .github: write

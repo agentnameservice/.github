@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import { pathToFileURL } from "node:url";
 import {
+  ORG,
   BASELINE,
   CHECKS,
   MERGE,
   access,
   configuration,
   ensure,
+  loginPattern,
 } from "./config.mjs";
 
 function active(rule) {
@@ -19,37 +21,37 @@ function active(rule) {
 }
 export function validate(config) {
   ensure(
-    !config.settings.rulesets && config.defaults.ruleset_scope === "repo",
-    "Use repository rulesets; organization rulesets need a paid plan",
+    config.defaults.ruleset_scope === "repo" && !config.settings.rulesets,
+    "Use repository rulesets on GitHub Free",
   );
   ensure(
     config.defaults.suborgrepos.includes("*") &&
       config.defaults.suborgrepos.includes(".*"),
-    "Defaults must cover new repositories and .github",
+    "Shared defaults cover enrolled repositories",
   );
-  const base = config.defaults.rulesets.find((r) => r.name === BASELINE);
+  const baseline = config.defaults.rulesets.find((r) => r.name === BASELINE);
   ensure(
-    active(base) && base.bypass_actors?.length === 0,
-    "The shared baseline has no bypass actors",
+    active(baseline) && baseline.bypass_actors?.length === 0,
+    "The baseline has no bypass actors",
   );
-  const types = base.rules.map((r) => r.type);
+  const rules = new Map(baseline.rules.map((r) => [r.type, r]));
+  const review = rules.get("pull_request")?.parameters;
   ensure(
-    types.includes("deletion") && types.includes("non_fast_forward"),
-    "Prevent deletion and force pushes",
+    rules.has("deletion") &&
+      rules.has("non_fast_forward") &&
+      review?.required_approving_review_count >= 1 &&
+      review.dismiss_stale_reviews_on_push &&
+      review.require_code_owner_review &&
+      review.required_review_thread_resolution,
+    "Keep baseline branch and review protections",
   );
-  const reviews = base.rules.find((r) => r.type === "pull_request")?.parameters;
+  const baselineChecks = rules.get("required_status_checks")?.parameters;
   ensure(
-    reviews?.required_approving_review_count >= 1 &&
-      reviews.dismiss_stale_reviews_on_push &&
-      reviews.require_code_owner_review &&
-      reviews.required_review_thread_resolution,
-    "Keep shared review requirements",
-  );
-  ensure(
-    base.rules
-      .find((r) => r.type === "required_status_checks")
-      ?.parameters.required_status_checks.some((c) => c.context === "DCO"),
-    "Keep DCO in the baseline",
+    baselineChecks?.strict_required_status_checks_policy === false &&
+      baselineChecks.required_status_checks.some(
+        (c) => c.context === "DCO" && c.integration_id == null,
+      ),
+    "The shared DCO check must remain compatible with merge queues",
   );
   for (const plugin of [
     "repository",
@@ -64,49 +66,76 @@ export function validate(config) {
       `Keep ${plugin} outside Safe Settings ownership`,
     );
   ensure(
-    !config.settings.disable_plugins.includes("rulesets") &&
-      config.settings.additive_plugins.includes("rulesets"),
-    "Manage repository rulesets additively",
+    config.settings.additive_plugins.includes("rulesets") &&
+      config.settings.additive_plugins.includes("labels"),
+    "Preserve unrelated rules and labels",
   );
-  for (const [name, settings] of Object.entries(config.repositories)) {
-    const mapping = access(name, settings);
+  for (const name of config.included)
     ensure(
-      !settings.rulesets.some((r) => r.name === BASELINE),
-      `${name}: change the shared baseline in its own file`,
+      config.repositories[name],
+      `${name}: included repositories need a configuration`,
+    );
+  for (const [name, settings] of Object.entries(config.repositories)) {
+    access(name, settings);
+    ensure(
+      !settings.teams && !settings.rulesets.some((r) => r.name === BASELINE),
+      `${name}: team grants belong in peribolos.yml and baseline rules in defaults.yml`,
     );
     const ci = settings.rulesets.find((r) => r.name === CHECKS);
     ensure(
-      active(ci) && !ci.bypass_actors.length && ci.rules.length === 1,
-      `${name}: CI has no bypass actors`,
+      active(ci) &&
+        !ci.bypass_actors.length &&
+        ci.rules.length === 1 &&
+        ci.rules[0].type === "required_status_checks",
+      `${name}: CI requirements have no bypass`,
     );
     const checks = ci.rules[0].parameters;
     ensure(
-      ci.rules[0].type === "required_status_checks" &&
-        checks.strict_required_status_checks_policy &&
-        checks.required_status_checks.length,
-      `${name}: require real CI`,
-    );
-    ensure(
-      checks.required_status_checks.every(
-        (c) =>
-          typeof c.context === "string" &&
-          c.context.trim() &&
-          !/[\x00-\x1f]/.test(c.context) &&
-          c.context !== "DCO",
-      ),
-      "List only CI checks additional to DCO",
+      typeof checks.strict_required_status_checks_policy === "boolean" &&
+        checks.required_status_checks.length &&
+        checks.required_status_checks.every(
+          (c) =>
+            typeof c.context === "string" &&
+            c.context.trim() &&
+            !/[\x00-\x1f]/.test(c.context),
+        ),
+      `${name}: require named CI checks`,
     );
     const gate = settings.rulesets.find((r) => r.name === MERGE);
     ensure(
       active(gate) &&
         gate.rules.length === 1 &&
         gate.rules[0].type === "update" &&
-        !gate.rules[0].parameters?.update_allows_fetch_and_merge &&
-        gate.bypass_actors.length === (mapping.bootstrap ? 2 : 1) &&
-        gate.bypass_actors.every(
-          (a) => a.actor_type === "Team" && a.bypass_mode === "pull_request",
-        ),
-      `${name}: merge exceptions apply only to the update rule, through PRs`,
+        !gate.rules[0].parameters?.update_allows_fetch_and_merge,
+      `${name}: team exceptions apply only to PR merges`,
+    );
+  }
+  const teams = config.peribolos.orgs[ORG].teams;
+  ensure(
+    teams && Object.keys(teams).length,
+    "Declare the teams managed by Peribolos",
+  );
+  for (const [name, team] of Object.entries(teams)) {
+    ensure(
+      [team.members || [], team.maintainers || []].every(
+        (list) =>
+          Array.isArray(list) &&
+          list.every(
+            (login) => typeof login === "string" && loginPattern.test(login),
+          ),
+      ),
+      `${name}: team membership must be lists of GitHub logins`,
+    );
+    const members = [...(team.members || []), ...(team.maintainers || [])];
+    ensure(
+      new Set(members).size === members.length,
+      `${name}: duplicate team membership`,
+    );
+    ensure(
+      Object.values(team.repos || {}).every((p) =>
+        ["read", "triage", "write", "maintain", "admin"].includes(p),
+      ),
+      `${name}: use native Peribolos repository permissions`,
     );
   }
 }
@@ -118,7 +147,7 @@ if (
     .then((config) => {
       validate(config);
       console.log(
-        `Validated native shared policy and ${Object.keys(config.repositories).length} repository overrides`,
+        `Validated ${Object.keys(config.repositories).length} repository configurations and Peribolos teams`,
       );
     })
     .catch((error) => {

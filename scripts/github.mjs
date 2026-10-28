@@ -25,20 +25,14 @@ export async function textFile(gh, repo, file, ref) {
   return Buffer.from(result.data.content, "base64").toString("utf8");
 }
 export async function publicRepository(gh, name) {
-  return repository(gh, name, false);
-}
-export async function rosterRepository(gh, name) {
-  return repository(gh, name, name === "governance");
-}
-async function repository(gh, name, allowPrivate) {
   repositoryName(name);
   const { data } = await gh.rest.repos.get({ owner: ORG, repo: name });
   ensure(
     data.full_name.toLowerCase() === `${ORG}/${name}` &&
-      (allowPrivate || !data.private) &&
+      !data.private &&
       !data.archived &&
       !data.fork,
-    `${name}: must be ${allowPrivate ? "" : "public, "}active, non-forked, and owned by ANS`,
+    `${name}: must be public, active, non-forked, and owned by ANS`,
   );
   return data;
 }

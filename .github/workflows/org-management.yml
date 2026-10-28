@@ -14,6 +14,9 @@ on:
   schedule:
     - cron: '23 */6 * * *'
 
+env:
+  PERIBOLOS_IMAGE: us-docker.pkg.dev/k8s-infra-prow/images/peribolos@sha256:b8dfdf7af7dc16d1a4b0f3efb760e6468f098f7e5f0fdd6f8271a07f17cba6d2 # v20261028-c06373a3e
+
 permissions:
   contents: read
 
@@ -47,8 +50,7 @@ jobs:
           client-id: ${{ vars.ORG_APP_CLIENT_ID }}
           private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
           owner: agentnameservice
-          permission-administration: ${{ env.APPLY == 'true' && 'write' || 'read' }}
-          permission-members: ${{ env.APPLY == 'true' && 'write' || 'read' }}
+          permission-members: read
           permission-contents: read
       - name: Verify manual apply requester
         if: github.event_name == 'workflow_dispatch' && env.APPLY == 'true'
@@ -56,13 +58,19 @@ jobs:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           REQUESTER: ${{ github.triggering_actor }}
         run: node --input-type=module -e "import {github,owner} from './scripts/github.mjs'; await owner(github(),process.env.REQUESTER)"
-      - name: Prepare roster teams before resolving rule exceptions
-        id: teams
+      - name: Prepare the App key for Peribolos
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-          REQUESTER: ${{ github.triggering_actor }}
-          GRANT_ACCESS: 'false'
-        run: node scripts/sync-rosters.mjs
+          APP_KEY: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$APP_KEY" > "$RUNNER_TEMP/org-app.pem"
+      - name: Reconcile teams and membership
+        env:
+          APP_ID: ${{ vars.ORG_APP_ID }}
+        run: |
+          args=(--config-path=/workspace/peribolos.yml --github-app-id="$APP_ID" --github-app-private-key-path=/key.pem --fix-teams --fix-team-members --maximum-removal-delta=0)
+          if [ "$APPLY" = true ]; then args+=(--confirm); fi
+          docker run --rm --user "$(id -u):$(id -g)" -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP/org-app.pem:/key.pem:ro" "$PERIBOLOS_IMAGE" "${args[@]}"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: github-community-projects/safe-settings
@@ -85,9 +93,13 @@ jobs:
           CREATE_PR_COMMENT: 'false'
           CREATE_ERROR_ISSUE: 'false'
         run: npm run full-sync
-      - name: Grant repository access after protections succeed
-        id: grants
+      - name: Reconcile team repository access after protections succeed
         env:
-          GH_TOKEN: ${{ steps.token.outputs.token }}
-          REQUESTER: ${{ github.triggering_actor }}
-        run: node scripts/sync-rosters.mjs
+          APP_ID: ${{ vars.ORG_APP_ID }}
+        run: |
+          args=(--config-path=/workspace/peribolos.yml --github-app-id="$APP_ID" --github-app-private-key-path=/key.pem --fix-teams --fix-team-repos --maximum-removal-delta=0)
+          if [ "$APPLY" = true ]; then args+=(--confirm); fi
+          docker run --rm --user "$(id -u):$(id -g)" -v "$GITHUB_WORKSPACE:/workspace:ro" -v "$RUNNER_TEMP/org-app.pem:/key.pem:ro" "$PERIBOLOS_IMAGE" "${args[@]}"
+      - name: Remove temporary App key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/org-app.pem"
