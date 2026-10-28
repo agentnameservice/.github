@@ -46,6 +46,13 @@ orgs:
         privacy: closed
         repos:
           ans-sdk-java: write
+      sdk-java-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - bchen-godaddy
+        privacy: closed
+        repos:
+          ans-sdk-java: write
       sdk-rust-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
@@ -73,12 +80,26 @@ orgs:
         privacy: closed
         repos:
           trust-index-spec: write
+      trust-index-spec-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
+        privacy: closed
+        repos:
+          trust-index-spec: write
       trust-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
           - kperry-godaddy
         members:
           - cyen-godaddy
+        privacy: closed
+        repos:
+          agent-trust-discovery: write
+      trust-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
         privacy: closed
         repos:
           agent-trust-discovery: write
