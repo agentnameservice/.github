@@ -1,92 +1,56 @@
-# ANS organization configuration
+# ANS organization management
 
-This repository holds the public organization profile, contribution guidance,
-and GitHub administration configuration. GitHub Actions runs Safe Settings
-with an organization-owned GitHub App. No server is required.
+This repository contains ANS's organization profile, contribution guidance,
+and GitHub configuration. Actions runs Safe Settings and synchronizes teams
+from repository rosters.
 
-## What you manage
+## Making changes
 
-| Change | Where to make it |
+| Change | Where |
 | --- | --- |
-| Project Maintainers or Reviewers | A PR to that project's `MAINTAINERS.md` |
-| TSC membership | A PR to `governance/TSC.md` |
-| Initial administrators, then elected officers | A PR to this repository's `MAINTAINERS.md` |
-| Repository enrollment, CI checks or pausing | **Actions → Manage repository** |
-| Shared protection policy | A PR to `safe-settings/suborgs/defaults.yml` |
-| Invitations, org Owners, security managers and 2FA | GitHub organization settings |
+| Project Maintainers and Reviewers | The project's `MAINTAINERS.md` |
+| TSC members | `governance/TSC.md` |
+| Administrators of this repository | [MAINTAINERS.md](MAINTAINERS.md) |
+| Enroll, update or pause a repository | **Actions → Manage repository** |
+| Shared protections | [defaults.yml](safe-settings/suborgs/defaults.yml) |
 
-Each roster lives in one place. There are no setup-roster copies to maintain.
-The form creates normal PRs containing native Safe Settings YAML. You do not
-need to edit a JSON inventory. Go SDK package repositories may reference the
-SDK roster with `Roster source: agentnameservice/ans-sdk-go/MAINTAINERS.md`.
+Use the form to inspect a repository or open a configuration PR. It reports
+missing rosters, CODEOWNERS and CI checks. Review and merge the PR, then run
+**Organization management → preview** before **apply**.
 
-## Initial run
+**Bootstrap access** keeps `tsc-owners` eligible to approve and merge during
+setup. **Keep current** preserves the existing choice and enables it for new
+repositories. Select **Remove** only after the access handoff is approved.
+DCO, CI and review requirements still apply.
 
-The initial configuration manages `.github` only, using `tsc-owners`. Connor
-and Keith are its interim members and retain their existing org Owner roles.
-This first run does not need a public governance repository or a TSC roster.
+Keep each roster in its own repository, using [MAINTAINERS.md](MAINTAINERS.md)
+as the format. The automation reads merged default-branch files. Governance
+may remain private if the App can read it; private governance is excluded from
+ruleset management on GitHub Free. Organization invitations and Owner roles
+are managed directly in GitHub.
 
-Follow [SETUP_CHECKLIST.md](SETUP_CHECKLIST.md) and [GITHUB_APP_SETUP.md](GITHUB_APP_SETUP.md).
-Keep `ORG_MANAGEMENT_ENABLED` and `ORG_AUTO_APPLY` false until the reviewed
-configuration is merged and the App credentials are ready. Then enable
-management with automatic apply still off and run **Organization management →
-preview**. Review the plan before running **apply**.
+## Running the automation
 
-## Everyday use
+The organization-owned App needs repository Administration, Contents, Checks,
+Issues and Pull requests write access; Commit statuses read access; and
+organization Members write access. Install it only on repositories it should
+manage or read. Webhooks are disabled because Actions runs the jobs.
 
-For a new public repository, prepare its roster, CODEOWNERS and real CI checks,
-add it to the App installation, and use **Manage repository → Enroll or update**.
-The form reports missing prerequisites and imports existing check requirements.
-Supply a tracking issue and your own certified DCO sign-off for the configuration
-PR. **Inspect repository** is read-only and needs neither.
+| Setting | Location |
+| --- | --- |
+| `ORG_APP_ID`, `ORG_APP_CLIENT_ID` | Repository Actions variables |
+| `ORG_APP_PRIVATE_KEY` | Secret in the `org-management` environment, restricted to `main` |
+| `ORG_MANAGEMENT_ENABLED` | Repository variable; `false` stops management |
+| `ORG_AUTO_APPLY` | Repository variable; `true` applies changes on pushes and the schedule |
 
-**Bootstrap access** defaults to **Keep current**: new project repositories start
-with `tsc-owners` as an additional code owner and PR merger. Existing repositories
-retain their current choice. After the user approves the final handoff, select
-**Remove** and review the configuration PR. The exception applies only to the
-merge restriction; DCO, CI and normal review requirements still apply.
+Keep automatic apply off until preview and a manual apply have been verified.
+An apply prepares teams, applies protections, then grants repository access.
+A protection failure stops the access-grant step. Existing unrelated grants
+and protections remain.
 
-CODEOWNERS must include the project Maintainer team, `@agentnameservice/tsc`, and,
-during bootstrap, `@agentnameservice/tsc-owners`. Preserve these shared teams on
-path-specific ownership rules as well. `.github` initially needs only
-`@agentnameservice/tsc-owners`. Adding TSC fallback there is a later reviewed
-CODEOWNERS/configuration change.
-
-Roster files use `## Maintainers` and `## Reviewers` sections with a `GitHub`
-table column containing plain `@handles`. Reviewers may be empty. The TSC uses
-its `## Voting members` table. The App reads approved default-branch revisions;
-it never takes membership authority from an unmerged PR.
-
-Governance may remain private. Install the App on it for authenticated roster
-reads. Private governance remains excluded from ruleset management on GitHub
-Free. Other managed repositories and shared project roster sources must be
-public, active ANS repositories. The historical archive stays excluded.
-
-## What synchronization changes
-
-An apply prepares team membership, runs Safe Settings, then grants repository
-Write access. A failed protection step prevents the access-grant step. Preview
-performs no team or repository-access writes. Both modes report failures.
-
-Safe Settings manages additive repository rulesets and labels. Existing classic
-protections and unrelated rulesets remain. Its repository-lifecycle, team and
-collaborator plugins are disabled. A small Octokit script reads the rosters,
-creates teams, reconciles membership, and grants their declared Write access.
-It does not invite people, demote org Owners, delete teams, or remove unrelated
-grants. Unexpected elevated, nested or foreign team access needs owner review.
-The shared TSC/bootstrap teams may retain Write on other active public ANS repos
-and on private governance during the transition.
-
-The baseline requires reviewed PRs, CODEOWNERS review, DCO, resolved conversations,
-and blocks branch deletion and force pushes. Separate rulesets require the
-repo's actual CI and restrict merges to its Maintainers plus any explicit
-bootstrap exception. The TSC alone grants review eligibility, not project
-merge authority; governance itself uses the TSC as its merge team.
-
-Once the pilot is accepted, `ORG_AUTO_APPLY=true` applies reviewed configuration
-and roster updates on pushes and a six-hour schedule. **Pause management** excludes
-a repository and any others sharing its Maintainer team; existing access and
-protections remain. Set `ORG_MANAGEMENT_ENABLED=false` to stop all management.
+[Repository configurations](safe-settings/repos) and
+[exclusions](safe-settings/deployment-settings.yml) define the managed scope.
+For App registration details, use [GitHub's documentation](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).
 
 ## Development
 
@@ -97,6 +61,5 @@ npm test
 python3 -m unittest discover -s tests -v
 ```
 
-Dependencies and Actions are pinned. The native runner is described in the
-[Safe Settings Actions guide](https://github.com/github-community-projects/safe-settings/blob/3.0.0/docs/github-action.md).
-Follow [CONTRIBUTING.md](CONTRIBUTING.md) for changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Safe Settings documentation](https://github.com/github-community-projects/safe-settings).

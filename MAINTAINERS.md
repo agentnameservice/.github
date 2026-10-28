@@ -1,8 +1,7 @@
 # Repository access roster
 
-Connor Snitker and Keith Perry manage `.github` through `@agentnameservice/tsc-owners` during initial setup. Both retain their existing organization Owner roles and their ability to approve and merge across the organization until setup is complete and the access handoff is approved.
-
-The elected Chair and Vice Chair take over this roster through a reviewed pull request after that handoff. The TSC roster is maintained separately in [governance/TSC.md](https://github.com/agentnameservice/governance/blob/main/TSC.md).
+Members of `tsc-owners` manage this repository. Membership changes are reviewed
+through pull requests to this file.
 
 ## Maintainers
 
