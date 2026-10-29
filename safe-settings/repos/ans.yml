@@ -29,9 +29,9 @@ rulesets:
     bypass_actors:
       - actor_type: Team
         name: ans-maintainers
-        bypass_mode: exempt
+        bypass_mode: pull_request
       - actor_type: Team
         name: tsc-owners
-        bypass_mode: exempt
+        bypass_mode: pull_request
     rules:
       - type: update

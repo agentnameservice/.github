@@ -32,11 +32,6 @@ merge-queue settings, signature requirements and unrelated protections.
 `tsc-owners` approval/merge access for new enrollments. Select **Remove** only
 after the handoff is approved. DCO, CI and review requirements still apply.
 
-The form exempts Maintainer teams from the separate update-only restriction.
-Exemption avoids a separate bypass action and does not emit bypass audit entries
-for that rule. The baseline and CI rulesets have no bypass actors: pull requests,
-approvals, required checks and force-push/deletion protections still apply.
-
 ## Running the automation
 
 Install the organization-owned App on the repositories listed in `peribolos.yml`.

@@ -241,14 +241,14 @@ export async function prepare(gh, config, inputs, actor) {
       {
         name: MERGE,
         ...common,
-        // Team exemptions cover only the update gate; separate rules enforce PRs and checks.
+        // Bootstrap access is explicit native YAML and never bypasses DCO/CI.
         bypass_actors: [
           mapping.maintainers,
           ...(mapping.bootstrap ? [BOOTSTRAP] : []),
         ].map((team) => ({
           actor_type: "Team",
           name: team,
-          bypass_mode: "exempt",
+          bypass_mode: "pull_request",
         })),
         rules: [{ type: "update" }],
       },

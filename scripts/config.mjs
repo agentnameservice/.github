@@ -46,10 +46,10 @@ export function access(name, config) {
     actors.every(
       (a) =>
         a.actor_type === "Team" &&
-        ["always", "pull_request", "exempt"].includes(a.bypass_mode) &&
+        a.bypass_mode === "pull_request" &&
         teamPattern.test(a.name),
     ),
-    `${name}: merge access must use named teams on the update-only gate`,
+    `${name}: merge access must use named teams through PRs`,
   );
   const mergers = actors.map((a) => a.name);
   const bootstrap = name !== REPO && mergers.includes(BOOTSTRAP);
