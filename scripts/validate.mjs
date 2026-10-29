@@ -48,11 +48,11 @@ export function validate(config) {
   );
   const baselineChecks = rules.get("required_status_checks")?.parameters;
   ensure(
-    baselineChecks?.strict_required_status_checks_policy === false &&
+    baselineChecks?.strict_required_status_checks_policy === true &&
       baselineChecks.required_status_checks.some(
         (c) => c.context === "DCO" && c.integration_id === DCO_APP,
       ),
-    "The shared DCO check must require the DCO App",
+    "The shared DCO check must require the DCO App and an up-to-date branch",
   );
   for (const plugin of [
     "repository",
@@ -99,7 +99,7 @@ export function validate(config) {
     );
     const checks = ci.rules[0].parameters;
     ensure(
-      typeof checks.strict_required_status_checks_policy === "boolean" &&
+      checks.strict_required_status_checks_policy === true &&
         checks.required_status_checks.length &&
         checks.required_status_checks.every(
           (c) =>
@@ -107,7 +107,7 @@ export function validate(config) {
             c.context.trim() &&
             !/[\x00-\x1f]/.test(c.context),
         ),
-      `${name}: require named CI checks`,
+      `${name}: require named CI checks on an up-to-date branch`,
     );
     ensure(
       checks.required_status_checks.some((c) => c.context === "DCO") &&
@@ -115,6 +115,10 @@ export function validate(config) {
           .filter((c) => c.context === "DCO")
           .every((c) => c.integration_id === DCO_APP),
       `${name}: DCO must require the DCO App`,
+    );
+    ensure(
+      settings.rulesets.every((r) => r.rules.every((rule) => rule.type !== "merge_queue")),
+      `${name}: Maintainers merge PRs directly with up-to-date checks`,
     );
     const gate = settings.rulesets.find((r) => r.name === MERGE);
     ensure(

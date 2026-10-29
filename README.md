@@ -24,9 +24,11 @@ keys use team display names; the form resolves their GitHub slugs for CODEOWNERS
 without renaming teams or adding Reviewers to merge allowlists.
 
 The repository form imports existing checks, preserves their App bindings, and
-opens a PR for the native YAML changes. Merge queues retain loose checks;
-other repositories require an up-to-date branch. The form preserves existing
-merge-queue settings, signature requirements and unrelated protections.
+opens a PR for the native YAML changes. Maintainers merge pull requests directly;
+required checks must pass on a branch that is up to date with the default branch.
+The form preserves signature requirements and unrelated protections. Repositories
+with merge queues must remove them before enrollment because queue pushes cannot
+satisfy the Maintainer-only update restriction.
 
 **Bootstrap access → Keep current** preserves the existing choice and enables
 `tsc-owners` approval/merge access for new enrollments. Select **Remove** only
@@ -51,9 +53,7 @@ can remain private.
 | `ORG_AUTO_APPLY` | Repository variable; `true` applies on pushes and the schedule |
 
 Before activation, complete the approved legacy-access cutover and verify that
-every live team is declared in `peribolos.yml`. Confirm a real queued merge
-with the Maintainer update restriction and DCO checks before extending automation
-to queued repositories. The DCO App checks both pull requests and merge groups;
+every live team is declared in `peribolos.yml`. The DCO App validates sign-offs;
 repositories do not need a workflow to stand in for that check.
 
 Run **Organization management → preview**, review the plan, then use **apply**.

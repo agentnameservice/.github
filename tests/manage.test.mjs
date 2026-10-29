@@ -179,27 +179,23 @@ test("configured reviewer routing is required and undeclared owners remain block
   }
 });
 
-test("merge queues retain loose checks while non-queued repositories stay strict", async () => {
+test("inspection reports queues and enrollment refuses the conflicting merge path", async () => {
   const result = await prepare(
-    fake({ queued: true }),
-    config(),
-    inputs(),
-    "requester",
+    fake({ queued: true }), config(),
+    { ...inputs(), operation: "Inspect repository" }, "requester",
   );
-  assert.equal(checks(result).strict_required_status_checks_policy, false);
-  assert.deepEqual(
-    checks(result).required_status_checks.find((c) => c.context === "DCO"),
-    { context: "DCO", integration_id: 1861 },
+  assert.equal(checks(result).strict_required_status_checks_policy, true);
+  assert.ok(result.pending.some((p) => p.startsWith("Remove the merge queue")));
+  await assert.rejects(
+    prepare(fake({ queued: true }), config(), inputs(), "requester"),
+    /Remove the merge queue/,
   );
 });
 
-test("DCO always requires the App, including on merge queues", async () => {
-  for (const queued of [false, true]) {
+test("new and imported DCO requirements always use the DCO App", async () => {
+  for (const ci of [false, true]) {
     const result = await prepare(
-      fake({ ci: false, queued }),
-      config(),
-      { ...inputs(), required_checks: "build" },
-      "requester",
+      fake({ ci }), config(), { ...inputs(), required_checks: "build" }, "requester",
     );
     assert.deepEqual(
       checks(result).required_status_checks.find((c) => c.context === "DCO"),
@@ -476,4 +472,20 @@ test("enrollment reports conflicting DCO bindings instead of replacing them", as
     prepare(gh, config(), inputs(), "requester"),
     /DCO must come from the DCO App/,
   );
+});
+
+
+test("configuration rejects stale-branch checks and merge queues", async () => {
+  for (const target of ["baseline", "repository"]) {
+    const actual = await configuration();
+    const rules = target === "baseline"
+      ? actual.defaults.rulesets[0].rules
+      : actual.repositories.ans.rulesets[0].rules;
+    rules.find((r) => r.type === "required_status_checks")
+      .parameters.strict_required_status_checks_policy = false;
+    assert.throws(() => validate(actual), /up-to-date branch/);
+  }
+  const actual = await configuration();
+  actual.repositories.ans.rulesets.push({ name: "Queue", rules: [{ type: "merge_queue" }] });
+  assert.throws(() => validate(actual), /Maintainers merge PRs directly/);
 });

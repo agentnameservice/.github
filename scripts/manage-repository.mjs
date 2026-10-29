@@ -211,7 +211,8 @@ export async function prepare(gh, config, inputs, actor) {
         )
       : new Set(required.keys());
     selected.add("DCO");
-    const queued = rules.some((rule) => rule.type === "merge_queue");
+    if (rules.some((rule) => rule.type === "merge_queue"))
+      pending.push("Remove the merge queue before enrolling; Maintainers merge PRs with up-to-date checks.");
     ensure(
       required.get("DCO")?.integration_id == null ||
         required.get("DCO").integration_id === DCO_APP,
@@ -235,7 +236,7 @@ export async function prepare(gh, config, inputs, actor) {
           {
             type: "required_status_checks",
             parameters: {
-              strict_required_status_checks_policy: !queued,
+              strict_required_status_checks_policy: true,
               required_status_checks: [...selected]
                 .sort()
                 .map((context) => required.get(context) || { context }),
