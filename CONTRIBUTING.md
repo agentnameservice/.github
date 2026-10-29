@@ -14,6 +14,9 @@ Explain the change and how you tested it, and complete the PR template. For
 changes in `ans-spec` or `trust-index-spec`, use exactly one of the
 `editorial` or `normative` labels.
 
+Dependabot PRs do not need a separate tracking issue. Conventional Commit titles,
+specification labels, and required review, DCO and CI checks still apply.
+
 ## Developer Certificate of Origin
 
 Sign off every contribution commit with `git commit --signoff`, certifying the

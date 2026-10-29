@@ -30,11 +30,13 @@ jobs:
           pr = event.get('pull_request')
           if pr is None:
               raise SystemExit('This workflow requires a pull request.')
+          author = pr.get('user') or {}
+          is_dependabot = author.get('login') == 'dependabot[bot]' and author.get('type') == 'Bot'
           errors = []
           if not re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spec)(\([^\r\n()]+\))?!?: \S', pr['title']):
               errors.append('Use a Conventional Commit PR title, such as docs: explain the setup.')
           body = re.sub(r'<!--[\s\S]*?-->', '', pr.get('body') or '')
-          if not re.search(r'\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)\b', body, re.I):
+          if not is_dependabot and not re.search(r'\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)\b', body, re.I):
               errors.append('Link a real issue using Fixes, Closes, or Resolves.')
           if os.environ['SPECIFICATION_REPOSITORY'] == 'true':
               labels = {label['name'] for label in pr.get('labels', [])}

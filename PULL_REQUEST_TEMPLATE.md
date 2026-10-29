@@ -1,7 +1,8 @@
 <!--
 Thank you for contributing to the Agent Name Service project!
 
-REQUIRED: every PR must link an issue with a closing keyword (e.g. "Fixes #123").
+REQUIRED: every PR except Dependabot updates must link an issue with a closing
+keyword (e.g. "Fixes #123").
 The issue is where we triage and prioritize; the PR is where we review.
 If no issue exists yet, open one first.
 
