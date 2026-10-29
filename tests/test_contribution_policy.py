@@ -40,6 +40,6 @@ class ContributionPolicyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertNotEqual(self.run_policy(title="please merge").returncode, 0)
 
-    def test_only_queue_metadata_can_skip_pr_metadata_check(self):
-        self.assertEqual(self.run_policy(event_name="merge_group").returncode, 0)
-        self.assertNotEqual(self.run_policy(event_name="workflow_dispatch").returncode, 0)
+    def test_events_without_a_pull_request_are_rejected(self):
+        for event_name in ["merge_group", "workflow_dispatch"]:
+            self.assertNotEqual(self.run_policy(event_name=event_name).returncode, 0)

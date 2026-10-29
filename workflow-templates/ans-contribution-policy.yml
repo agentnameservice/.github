@@ -7,7 +7,6 @@ name: Check contribution metadata
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
-  merge_group:
 
 permissions:
   contents: read

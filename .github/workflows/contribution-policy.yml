@@ -29,10 +29,7 @@ jobs:
               event = json.load(handle)
           pr = event.get('pull_request')
           if pr is None:
-              if os.environ['GITHUB_EVENT_NAME'] == 'merge_group':
-                  print('PR metadata was checked before queue entry; merge groups have no PR metadata.')
-                  sys.exit(0)
-              raise SystemExit('This workflow requires pull_request or merge_group.')
+              raise SystemExit('This workflow requires a pull request.')
           errors = []
           if not re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spec)(\([^\r\n()]+\))?!?: \S', pr['title']):
               errors.append('Use a Conventional Commit PR title, such as docs: explain the setup.')
