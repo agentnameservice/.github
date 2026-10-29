@@ -36,6 +36,12 @@ after the handoff is approved. DCO, CI and review requirements still apply.
 DCO checks require the DCO App (ID `1861`); a workflow job named `DCO` cannot
 satisfy that requirement.
 
+Maintainer teams are exempt from the separate update-only gate so they can use
+the normal merge button. The baseline and CI rulesets have no exemptions, so
+pull requests, approvals, up-to-date checks and DCO remain mandatory. Exemptions
+do not create bypass audit entries for the update gate; PR history records the
+merging user.
+
 ## Running the automation
 
 Install the organization-owned App on the repositories listed in `peribolos.yml`.

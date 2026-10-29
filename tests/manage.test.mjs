@@ -150,7 +150,7 @@ test("reviewer teams retain review access without becoming the inferred merge te
   );
   assert.deepEqual(result.pending, []);
   assert.deepEqual(result.value.rulesets[1].bypass_actors, [
-    { actor_type: "Team", name: "custom-maintainers", bypass_mode: "pull_request" },
+    { actor_type: "Team", name: "custom-maintainers", bypass_mode: "exempt" },
   ]);
   for (const team of ["sample-reviewers", "other-reviewers", "triage-reviewers"])
     assert.deepEqual(result.peribolos.orgs.agentnameservice.teams[team], teams[team]);
@@ -241,7 +241,7 @@ test("conflicting check bindings fail instead of dropping an App restriction", a
   );
 });
 
-test("bootstrap grants preserve both administrators and apply only to PR merge restrictions", async () => {
+test("bootstrap grants preserve both administrators through the update-only gate", async () => {
   const result = await prepare(
     fake({
       owners:
@@ -254,8 +254,8 @@ test("bootstrap grants preserve both administrators and apply only to PR merge r
   assert.deepEqual(
     result.value.rulesets[1].bypass_actors.map((a) => [a.name, a.bypass_mode]),
     [
-      ["sample-maintainers", "pull_request"],
-      ["tsc-owners", "pull_request"],
+      ["sample-maintainers", "exempt"],
+      ["tsc-owners", "exempt"],
     ],
   );
   assert.deepEqual(result.value.rulesets[0].bypass_actors, []);
@@ -488,4 +488,29 @@ test("configuration rejects stale-branch checks and merge queues", async () => {
   const actual = await configuration();
   actual.repositories.ans.rulesets.push({ name: "Queue", rules: [{ type: "merge_queue" }] });
   assert.throws(() => validate(actual), /Maintainers merge PRs directly/);
+});
+
+test("merge-team exemptions cannot disable review or required-check enforcement", async () => {
+  for (const target of ["baseline", "checks", "gate"]) {
+    const actual = await configuration();
+    const gate = actual.repositories.ans.rulesets.find(
+      (r) => r.name === "ANS Maintainer merges",
+    );
+    assert.ok(gate.bypass_actors.every(
+      (a) => a.actor_type === "Team" && a.bypass_mode === "exempt",
+    ));
+    if (target === "baseline") {
+      actual.defaults.rulesets[0].bypass_actors = gate.bypass_actors;
+      assert.throws(() => validate(actual), /baseline has no bypass actors/);
+    } else if (target === "checks") {
+      actual.repositories.ans.rulesets[0].bypass_actors = gate.bypass_actors;
+      assert.throws(() => validate(actual), /CI requirements have no bypass/);
+    } else {
+      gate.rules.push({
+        type: "pull_request",
+        parameters: { required_approving_review_count: 1 },
+      });
+      assert.throws(() => validate(actual), /limited to the update-only gate/);
+    }
+  }
 });

@@ -126,7 +126,7 @@ export function validate(config) {
         gate.rules.length === 1 &&
         gate.rules[0].type === "update" &&
         !gate.rules[0].parameters?.update_allows_fetch_and_merge,
-      `${name}: team exceptions apply only to PR merges`,
+      `${name}: team exemptions must be limited to the update-only gate`,
     );
   }
   const teams = config.peribolos.orgs[ORG].teams;

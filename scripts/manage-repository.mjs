@@ -247,14 +247,14 @@ export async function prepare(gh, config, inputs, actor) {
       {
         name: MERGE,
         ...common,
-        // Bootstrap access is explicit native YAML and never bypasses DCO/CI.
+        // Separate rules enforce reviews and checks; these exemptions cover only updates.
         bypass_actors: [
           mapping.maintainers,
           ...(mapping.bootstrap ? [BOOTSTRAP] : []),
         ].map((team) => ({
           actor_type: "Team",
           name: team,
-          bypass_mode: "pull_request",
+          bypass_mode: "exempt",
         })),
         rules: [{ type: "update" }],
       },

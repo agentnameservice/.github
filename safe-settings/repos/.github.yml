@@ -26,6 +26,6 @@ rulesets:
     bypass_actors:
       - actor_type: Team
         name: tsc-owners
-        bypass_mode: pull_request
+        bypass_mode: exempt
     rules:
       - type: update
