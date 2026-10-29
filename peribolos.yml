@@ -69,7 +69,7 @@ orgs:
           - scourtney-godaddy
         privacy: closed
         repos:
-          ans-registry: write
+          ans-spec: write
       trust-index-spec-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
@@ -115,7 +115,7 @@ orgs:
           ans: write
           ans-gateway-auth: write
           ans-openshell: write
-          ans-registry: write
+          ans-spec: write
           ans-sdk-go: write
           ans-sdk-java: write
           ans-sdk-rust: write
@@ -136,7 +136,7 @@ orgs:
           ans: write
           ans-gateway-auth: write
           ans-openshell: write
-          ans-registry: write
+          ans-spec: write
           ans-sdk-go: write
           ans-sdk-java: write
           ans-sdk-rust: write

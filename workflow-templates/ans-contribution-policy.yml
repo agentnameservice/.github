@@ -16,4 +16,4 @@ jobs:
   contribution:
     uses: agentnameservice/.github/.github/workflows/contribution-policy.yml@main
     with:
-      specification: ${{ contains(fromJSON('["ans-registry", "trust-index-spec"]'), github.event.repository.name) }}
+      specification: ${{ contains(fromJSON('["ans-spec", "trust-index-spec"]'), github.event.repository.name) }}

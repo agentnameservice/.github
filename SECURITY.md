@@ -2,7 +2,7 @@
 
 Use **Report a vulnerability** under the affected repository's Security tab.
 For specification vulnerabilities, use the
-[ans-registry reporting form](https://github.com/agentnameservice/ans-registry/security/advisories/new).
+[ans-spec reporting form](https://github.com/agentnameservice/ans-spec/security/advisories/new).
 For this repository, use [private reporting](https://github.com/agentnameservice/.github/security/advisories/new).
 
 Include the affected version, reproduction steps, impact, and any proposed fix.

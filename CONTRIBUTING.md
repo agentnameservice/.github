@@ -11,7 +11,7 @@ Repository-specific contribution instructions may add requirements.
 Open a tracking issue and reference it with a closing keyword such as `Fixes
 #123`. Use a [Conventional Commits](https://www.conventionalcommits.org/) title.
 Explain the change and how you tested it, and complete the PR template. For
-changes in `ans-registry` or `trust-index-spec`, use exactly one of the
+changes in `ans-spec` or `trust-index-spec`, use exactly one of the
 `editorial` or `normative` labels.
 
 ## Developer Certificate of Origin
