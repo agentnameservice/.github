@@ -1,0 +1,143 @@
+orgs:
+  agentnameservice:
+    teams:
+      ans-gateway-auth-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        privacy: closed
+        repos:
+          ans-gateway-auth: write
+      ans-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members:
+          - jhateley-godaddy
+        privacy: closed
+        repos:
+          ans: write
+      ans-openshell-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        privacy: closed
+        repos:
+          ans-openshell: write
+      sdk-go-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        privacy: closed
+        repos:
+          ans-sdk-go: write
+          homebrew-ans: write
+          scoop-ans: write
+      sdk-java-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - kperry-godaddy
+        members:
+          - jhateley-godaddy
+        privacy: closed
+        repos:
+          ans-sdk-java: write
+      sdk-java-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - bchen-godaddy
+        privacy: closed
+        repos:
+          ans-sdk-java: write
+      sdk-rust-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        privacy: closed
+        repos:
+          ans-sdk-rust: write
+      spec-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+          - scourtney-godaddy
+        privacy: closed
+        repos:
+          ans-spec: write
+      trust-index-spec-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        members:
+          - cyen-godaddy
+        privacy: closed
+        repos:
+          trust-index-spec: write
+      trust-index-spec-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
+        privacy: closed
+        repos:
+          trust-index-spec: write
+      trust-maintainers:
+        description: 'ANS governance roster: repository Maintainers'
+        maintainers:
+          - kperry-godaddy
+        members:
+          - cyen-godaddy
+        privacy: closed
+        repos:
+          agent-trust-discovery: write
+      trust-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
+        privacy: closed
+        repos:
+          agent-trust-discovery: write
+      tsc:
+        description: 'ANS governance roster: TSC voting members'
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+          - scourtney-godaddy
+        privacy: closed
+        repos:
+          agent-trust-discovery: write
+          ans: write
+          ans-gateway-auth: write
+          ans-openshell: write
+          ans-spec: write
+          ans-sdk-go: write
+          ans-sdk-java: write
+          ans-sdk-rust: write
+          governance: write
+          trust-index-spec: write
+        members:
+          - kantorcodes
+          - kenhuangus
+      tsc-owners:
+        description: Organization configuration administrators
+        maintainers:
+          - csnitker-godaddy
+          - kperry-godaddy
+        privacy: closed
+        repos:
+          .github: write
+          agent-trust-discovery: write
+          ans: write
+          ans-gateway-auth: write
+          ans-openshell: write
+          ans-spec: write
+          ans-sdk-go: write
+          ans-sdk-java: write
+          ans-sdk-rust: write
+          trust-index-spec: write

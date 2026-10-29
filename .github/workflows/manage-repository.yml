@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Manage repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect settings, prepare a configuration PR, or pause management
+        type: choice
+        options: [Inspect repository, Enroll or update, Pause management]
+        default: Inspect repository
+      repository:
+        description: Repository name within agentnameservice
+        type: string
+        required: true
+      required_checks:
+        description: Optional CI check names separated by semicolons; blank keeps/imports existing requirements
+        type: string
+      bootstrap_access:
+        description: Keep tsc-owners approval and merge access during setup; new repositories start enabled
+        type: choice
+        options: [Keep current, Enable, Remove]
+        default: Keep current
+      issue:
+        description: Issue number in .github for this change (not needed for Inspect)
+        type: string
+      signoff:
+        description: Your own Full Name <email>, published in the commit (not needed for Inspect)
+        type: string
+      certify_dco:
+        description: I certify the DCO and authorize my supplied sign-off on this configuration change
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-request-${{ inputs.repository }}
+  cancel-in-progress: false
+
+jobs:
+  request:
+    if: >-
+      github.repository == 'agentnameservice/.github' &&
+      github.ref == 'refs/heads/main' &&
+      vars.ORG_MANAGEMENT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: org-management
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: read
+        with:
+          client-id: ${{ secrets.ORG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          owner: agentnameservice
+          permission-administration: read
+          permission-contents: read
+          permission-members: read
+          permission-checks: read
+          permission-statuses: read
+          permission-pull-requests: read
+          permission-issues: read
+      - name: Inspect and prepare the request
+        id: prepare
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          REQUESTER: ${{ github.triggering_actor }}
+        run: node scripts/manage-repository.mjs
+      - name: Validate generated configuration
+        if: steps.prepare.outputs.changed == 'true'
+        run: npm run validate
+      - name: Create a token limited to configuration PRs
+        if: steps.prepare.outputs.changed == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: write
+        with:
+          client-id: ${{ secrets.ORG_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ORG_APP_PRIVATE_KEY }}
+          owner: agentnameservice
+          repositories: .github
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open or update the configuration PR
+        if: steps.prepare.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.write.outputs.token }}
+          base: main
+          branch: ${{ steps.prepare.outputs.branch }}
+          title: ${{ steps.prepare.outputs.title }}
+          body-path: reports/request.md
+          author: ${{ steps.prepare.outputs.author }}
+          commit-message: ${{ steps.prepare.outputs.commit_message }}
+          signoff: false
+          add-paths: |
+            safe-settings/
+            peribolos.yml

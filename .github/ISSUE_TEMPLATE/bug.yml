@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible problem. Use private vulnerability reporting for security issues.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the affected version and the behavior you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Provide a minimal example with credentials and personal information removed.
+    validations:
+      required: true

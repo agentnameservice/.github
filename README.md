@@ -1,0 +1,105 @@
+# ANS organization management
+
+GitHub Actions runs [Peribolos](https://github.com/kubernetes-sigs/prow/tree/main/cmd/peribolos)
+for teams and access, and [Safe Settings](https://github.com/github-community-projects/safe-settings)
+for repository protections. No server or Kubernetes cluster is required.
+
+## Making changes
+
+| Change | Where |
+| --- | --- |
+| Teams, members and repository access | [peribolos.yml](peribolos.yml) |
+| Enroll, update or pause repository settings | **Actions → Manage repository** |
+| Shared protections | [defaults.yml](safe-settings/suborgs/defaults.yml) |
+| Organization Owners and invitations | GitHub organization settings |
+
+Open a PR for membership changes in `peribolos.yml`, with the affected project's
+approvals required by governance. Its `members` and
+`maintainers` are GitHub team roles; both receive the team's repository access.
+Keep governance decisions in governance documents and GitHub access in this
+configuration. Repository Maintainer pages link here instead of copying rosters.
+
+Reviewer team slugs use the `-reviewers` suffix and Write access. Peribolos
+keys use team display names; the form resolves their GitHub slugs for CODEOWNERS
+without renaming teams or adding Reviewers to merge allowlists.
+
+The repository form imports existing checks, preserves their App bindings, and
+opens a PR for the native YAML changes. Maintainers merge pull requests directly;
+required checks must pass on a branch that is up to date with the default branch.
+The form preserves signature requirements and unrelated protections. Repositories
+with merge queues must remove them before enrollment because queue pushes cannot
+satisfy the Maintainer-only update restriction.
+
+**Bootstrap access → Keep current** preserves the existing choice and enables
+`tsc-owners` approval/merge access for new enrollments. Select **Remove** only
+after the handoff is approved. DCO, CI and review requirements still apply.
+DCO checks require the DCO App (ID `1861`); a workflow job named `DCO` cannot
+satisfy that requirement.
+
+Maintainer teams are exempt from the separate update-only gate so they can use
+the normal merge button. The baseline and CI rulesets have no exemptions, so
+pull requests, approvals, up-to-date checks and DCO remain mandatory. Exemptions
+do not create bypass audit entries for the update gate; PR history records the
+merging user.
+
+## Running the automation
+
+Install the organization-owned App on the repositories listed in `peribolos.yml`.
+It needs repository Administration, Contents, Checks, Issues and Pull requests
+write access; Commit statuses read access; and organization Members write access.
+Safe Settings creates a final check run when applying changes, so Checks write
+is required even with PR comments disabled. Webhooks are disabled. Governance
+can remain private.
+
+| Setting | Location |
+| --- | --- |
+| `ORG_APP_ID`, `ORG_APP_CLIENT_ID` | Repository Actions secrets |
+| `ORG_APP_PRIVATE_KEY` | Secret in the `org-management` environment, restricted to `main` |
+| `ORG_MANAGEMENT_ENABLED` | Repository variable; `false` stops management |
+| `ORG_AUTO_APPLY` | Repository variable; `true` applies on pushes and the schedule |
+
+Before activation, complete the approved legacy-access cutover and verify that
+every live team is declared in `peribolos.yml`. The DCO App validates sign-offs;
+repositories do not need a workflow to stand in for that check.
+
+Run **Organization management → preview**, review the plan, then use **apply**.
+Keep automatic apply off until the first run is verified. Teams and memberships
+are reconciled first, protections next, and repository grants last. A failed
+protection step stops the grant step.
+
+Peribolos does not manage org Owners, org-wide membership, repository lifecycle,
+or direct collaborators. It preserves team names. `--maximum-removal-delta=0`
+fails the entire run when any existing team is absent from `peribolos.yml`.
+Declare or retire undeclared teams before running preview or apply; membership
+and grant changes follow the reviewed YAML.
+Manual changes to managed teams are reconciled to that configuration.
+
+Peribolos's [native dump](https://github.com/kubernetes-sigs/prow/blob/main/site/content/en/docs/components/cli-tools/peribolos.md#initial-seed)
+can capture existing teams. Review its `orgs.agentnameservice.teams` section and
+retain approved pending invitations; raw billing/contact metadata stays outside
+this repository. Safe Settings provides a [native repository exporter](https://github.com/github-community-projects/safe-settings#generating-settings-from-existing-configuration).
+
+Only repositories in [the settings scope](safe-settings/deployment-settings.yml)
+receive Safe Settings changes. [Repository configs](safe-settings/repos) can be
+prepared before enrollment. Pausing settings leaves existing access unchanged.
+
+Publish the shared workflow and governance documents before adopting repository
+callers and links. Land each repository's `MAINTAINERS.md`, CODEOWNERS and required
+CI support before enrollment. Create the `editorial` and `normative` labels
+before enabling the contribution-policy workflow in either specification
+repository; the shared defaults maintain those labels after enrollment.
+
+`homebrew-ans` and `scoop-ans` are excluded from protection management because
+GoReleaser publishes their generated package updates directly to `main`.
+Their Maintainer team access is still managed through Peribolos.
+
+## Development
+
+```sh
+npm ci --ignore-scripts
+npm run validate
+npm test
+python3 -m unittest discover -s tests -v
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [GitHub's App documentation](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app).

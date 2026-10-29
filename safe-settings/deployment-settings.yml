@@ -1,0 +1,7 @@
+restrictedRepos:
+  include:
+    - .github
+  # GoReleaser publishes generated package updates directly to main.
+  exclude:
+    - homebrew-ans
+    - scoop-ans
