@@ -12,6 +12,7 @@ export const ORG = "agentnameservice";
 export const REPO = ".github";
 export const BASELINE = "ANS baseline";
 export const CHECKS = "ANS repository checks";
+export const DCO_APP = 1861;
 export const MERGE = "ANS Maintainer merges";
 export const TSC = "tsc";
 export const BOOTSTRAP = "tsc-owners";

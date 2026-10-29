@@ -31,6 +31,8 @@ merge-queue settings, signature requirements and unrelated protections.
 **Bootstrap access → Keep current** preserves the existing choice and enables
 `tsc-owners` approval/merge access for new enrollments. Select **Remove** only
 after the handoff is approved. DCO, CI and review requirements still apply.
+DCO checks require the DCO App (ID `1861`); a workflow job named `DCO` cannot
+satisfy that requirement.
 
 ## Running the automation
 
@@ -51,8 +53,8 @@ can remain private.
 Before activation, complete the approved legacy-access cutover and verify that
 every live team is declared in `peribolos.yml`. Confirm a real queued merge
 with the Maintainer update restriction and DCO checks before extending automation
-to queued repositories. Verify DCO App reporting on merge-group commits before
-binding queued DCO checks to the App or removing the merge-group workflows.
+to queued repositories. The DCO App checks both pull requests and merge groups;
+repositories do not need a workflow to stand in for that check.
 
 Run **Organization management → preview**, review the plan, then use **apply**.
 Keep automatic apply off until the first run is verified. Teams and memberships

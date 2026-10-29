@@ -8,6 +8,7 @@ import {
   ORG,
   REPO,
   CHECKS,
+  DCO_APP,
   MERGE,
   TSC,
   BOOTSTRAP,
@@ -211,8 +212,12 @@ export async function prepare(gh, config, inputs, actor) {
       : new Set(required.keys());
     selected.add("DCO");
     const queued = rules.some((rule) => rule.type === "merge_queue");
-    if (!queued && !required.has("DCO"))
-      required.set("DCO", { context: "DCO", integration_id: 1861 });
+    ensure(
+      required.get("DCO")?.integration_id == null ||
+        required.get("DCO").integration_id === DCO_APP,
+      "DCO must come from the DCO App; resolve its conflicting App binding first",
+    );
+    required.set("DCO", { context: "DCO", integration_id: DCO_APP });
     const common = {
       target: "branch",
       enforcement: "active",

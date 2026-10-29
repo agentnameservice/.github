@@ -4,6 +4,7 @@ import {
   ORG,
   BASELINE,
   CHECKS,
+  DCO_APP,
   MERGE,
   access,
   configuration,
@@ -49,9 +50,9 @@ export function validate(config) {
   ensure(
     baselineChecks?.strict_required_status_checks_policy === false &&
       baselineChecks.required_status_checks.some(
-        (c) => c.context === "DCO" && c.integration_id == null,
+        (c) => c.context === "DCO" && c.integration_id === DCO_APP,
       ),
-    "The shared DCO check must remain compatible with merge queues",
+    "The shared DCO check must require the DCO App",
   );
   for (const plugin of [
     "repository",
@@ -107,6 +108,13 @@ export function validate(config) {
             !/[\x00-\x1f]/.test(c.context),
         ),
       `${name}: require named CI checks`,
+    );
+    ensure(
+      checks.required_status_checks.some((c) => c.context === "DCO") &&
+        checks.required_status_checks
+          .filter((c) => c.context === "DCO")
+          .every((c) => c.integration_id === DCO_APP),
+      `${name}: DCO must require the DCO App`,
     );
     const gate = settings.rulesets.find((r) => r.name === MERGE);
     ensure(

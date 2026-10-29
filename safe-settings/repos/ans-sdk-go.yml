@@ -16,6 +16,7 @@ rulesets:
             - context: Build & Test
               integration_id: 15368
             - context: DCO
+              integration_id: 1861
             - context: Lint
               integration_id: 15368
   - name: ANS Maintainer merges

@@ -107,7 +107,7 @@ test("enrollment writes native repository rules and Peribolos grants without cha
   const result = await prepare(fake(), initial, inputs(), "requester");
   assert.equal(result.value.teams, undefined);
   assert.deepEqual(checks(result).required_status_checks, [
-    { context: "DCO" },
+    { context: "DCO", integration_id: 1861 },
     { context: "test", integration_id: 15368 },
   ]);
   assert.equal(checks(result).strict_required_status_checks_policy, true);
@@ -189,11 +189,11 @@ test("merge queues retain loose checks while non-queued repositories stay strict
   assert.equal(checks(result).strict_required_status_checks_policy, false);
   assert.deepEqual(
     checks(result).required_status_checks.find((c) => c.context === "DCO"),
-    { context: "DCO" },
+    { context: "DCO", integration_id: 1861 },
   );
 });
 
-test("a newly selected DCO requirement uses the App except on merge queues", async () => {
+test("DCO always requires the App, including on merge queues", async () => {
   for (const queued of [false, true]) {
     const result = await prepare(
       fake({ ci: false, queued }),
@@ -203,7 +203,7 @@ test("a newly selected DCO requirement uses the App except on merge queues", asy
     );
     assert.deepEqual(
       checks(result).required_status_checks.find((c) => c.context === "DCO"),
-      queued ? { context: "DCO" } : { context: "DCO", integration_id: 1861 },
+      { context: "DCO", integration_id: 1861 },
     );
   }
 });
@@ -219,7 +219,7 @@ test("updating existing config preserves check App bindings and accepts added ch
     "requester",
   );
   assert.deepEqual(checks(result).required_status_checks, [
-    { context: "DCO" },
+    { context: "DCO", integration_id: 1861 },
     { context: "build" },
     { context: "test", integration_id: 15368 },
   ]);
@@ -445,4 +445,35 @@ test("explicit exclusions cannot be overridden by the include list", async () =>
     actual.included.add(repository);
     assert.throws(() => validate(actual), /excluded repositories/);
   }
+});
+
+
+test("DCO validation rejects unbound and workflow-supplied checks", async () => {
+  for (const target of ["baseline", "repository"]) {
+    for (const binding of [undefined, 15368]) {
+      const actual = await configuration();
+      const rules = target === "baseline"
+        ? actual.defaults.rulesets[0].rules
+        : actual.repositories.ans.rulesets[0].rules;
+      const dco = rules.find((r) => r.type === "required_status_checks")
+        .parameters.required_status_checks.find((c) => c.context === "DCO");
+      if (binding === undefined) delete dco.integration_id;
+      else dco.integration_id = binding;
+      assert.throws(() => validate(actual), /DCO.*require.*DCO App/);
+    }
+  }
+});
+
+test("enrollment reports conflicting DCO bindings instead of replacing them", async () => {
+  const gh = fake();
+  const paginate = gh.paginate;
+  gh.paginate = async (route, args) => route.startsWith("GET /repos/")
+    ? [{ type: "required_status_checks", parameters: {
+        required_status_checks: [{ context: "DCO", integration_id: 15368 }],
+      } }]
+    : paginate(route, args);
+  await assert.rejects(
+    prepare(gh, config(), inputs(), "requester"),
+    /DCO must come from the DCO App/,
+  );
 });

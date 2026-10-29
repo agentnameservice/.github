@@ -24,6 +24,7 @@ rulesets:
             - context: Container images & Helm chart (ans-reference-callee)
               integration_id: 15368
             - context: DCO
+              integration_id: 1861
             - context: Generated bindings match protos
               integration_id: 15368
             - context: Lint

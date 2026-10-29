@@ -14,6 +14,7 @@ rulesets:
           strict_required_status_checks_policy: false
           required_status_checks:
             - context: DCO
+              integration_id: 1861
             - context: Lint
               integration_id: 15368
   - name: ANS Maintainer merges
