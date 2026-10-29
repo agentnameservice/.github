@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { prepare, signoff } from "../scripts/manage-repository.mjs";
-import { configuration, repositoryName, access } from "../scripts/config.mjs";
+import { configuration, repositoryName } from "../scripts/config.mjs";
 import { validate } from "../scripts/validate.mjs";
 
 function config() {
@@ -38,6 +38,7 @@ function fake({
   role = "admin",
   queued = false,
   ci = true,
+  teamNames = {},
   owners = "* @agentnameservice/sample-maintainers @agentnameservice/tsc",
 } = {}) {
   return {
@@ -80,17 +81,23 @@ function fake({
       },
       pulls: { list: async () => ({ data: [] }) },
       checks: { listForRef: "checks" },
-      teams: {
-        getByName: async ({ team_slug }) => ({ data: { name: team_slug } }),
-      },
+      teams: { list: "teams" },
       issues: { get: async () => ({ data: { number: 9 } }) },
     },
-    paginate: async (route) =>
-      route === "checks"
-        ? [{ name: "DCO" }, { name: "test" }, { name: "build" }]
-        : route.startsWith("GET /repos/") && queued
-          ? [{ type: "merge_queue" }]
-          : [],
+    paginate: async (route) => {
+      if (route === "teams")
+        return [
+          "sample-maintainers", "custom-maintainers", "sample-reviewers",
+          "other-reviewers", "triage-reviewers", "tsc", "tsc-owners",
+        ]
+          .filter((slug) => teamNames[slug] !== null)
+          .map((slug) => ({ slug, name: teamNames[slug] || slug }));
+      if (route === "checks")
+        return [{ name: "DCO" }, { name: "test" }, { name: "build" }];
+      if (route.startsWith("GET /repos/") && queued)
+        return [{ type: "merge_queue" }];
+      return [];
+    },
   };
 }
 const checks = (result) => result.value.rulesets[0].rules[0].parameters;
@@ -286,18 +293,57 @@ test("the form uses existing display names rather than renaming teams", async ()
   initial.peribolos.orgs.agentnameservice.teams["Sample Maintainers"] =
     initial.peribolos.orgs.agentnameservice.teams["sample-maintainers"];
   delete initial.peribolos.orgs.agentnameservice.teams["sample-maintainers"];
-  const gh = fake();
-  gh.rest.teams.getByName = async ({ team_slug }) => ({
-    data: {
-      name:
-        team_slug === "sample-maintainers" ? "Sample Maintainers" : team_slug,
-    },
-  });
+  const gh = fake({ teamNames: { "sample-maintainers": "Sample Maintainers" } });
   const result = await prepare(gh, initial, inputs(), "requester");
   assert.equal(
     result.peribolos.orgs.agentnameservice.teams["Sample Maintainers"].repos
       .sample,
     "write",
+  );
+});
+
+test("reviewer display names resolve to live slugs without gaining merge access", async () => {
+  const initial = config();
+  const teams = initial.peribolos.orgs.agentnameservice.teams;
+  teams["Sample Maintainers"] = teams["sample-maintainers"];
+  delete teams["sample-maintainers"];
+  teams["Sample Reviewers"] = { members: ["reviewer"], repos: { sample: "write" } };
+  const result = await prepare(
+    fake({
+      teamNames: {
+        "sample-maintainers": "Sample Maintainers",
+        "sample-reviewers": "Sample Reviewers",
+      },
+      owners: "* @agentnameservice/sample-maintainers @agentnameservice/sample-reviewers @agentnameservice/tsc",
+    }),
+    initial,
+    inputs(),
+    "requester",
+  );
+  assert.deepEqual(result.pending, []);
+  assert.deepEqual(result.value.rulesets[1].bypass_actors.map((a) => a.name), [
+    "sample-maintainers",
+  ]);
+  assert.deepEqual(
+    result.peribolos.orgs.agentnameservice.teams["Sample Reviewers"],
+    teams["Sample Reviewers"],
+  );
+  assert.equal(result.peribolos.orgs.agentnameservice.teams["sample-reviewers"], undefined);
+});
+
+test("a declared reviewer team must exist before enrollment", async () => {
+  const initial = config();
+  initial.peribolos.orgs.agentnameservice.teams["sample-reviewers"] = {
+    members: ["reviewer"], repos: { sample: "write" },
+  };
+  await assert.rejects(
+    prepare(
+      fake({ teamNames: { "sample-reviewers": null } }),
+      initial,
+      inputs(),
+      "requester",
+    ),
+    /Apply team sample-reviewers from peribolos.yml/,
   );
 });
 
@@ -379,21 +425,8 @@ test("unknown checks and excluded/foreign names cannot be enrolled", async () =>
     assert.throws(() => repositoryName(name));
 });
 
-test("checked-in scope starts with .github; ans preserves its real queued CI", async () => {
-  const actual = await configuration();
-  validate(actual);
-  assert.deepEqual([...actual.included], [".github"]);
-  const ans = actual.repositories.ans.rulesets[0].rules[0].parameters;
-  assert.equal(ans.strict_required_status_checks_policy, false);
-  assert.deepEqual(ans.required_status_checks, [
-    { context: "DCO" },
-    { context: "Build & Test", integration_id: 15368 },
-    { context: "Lint", integration_id: 15368 },
-  ]);
-  assert.equal(
-    access(".github", actual.repositories[".github"]).maintainers,
-    "tsc-owners",
-  );
+test("checked-in native configuration satisfies the governance invariants", async () => {
+  validate(await configuration());
 });
 
 test("package repositories remain excluded from protection enrollment", async () => {

@@ -120,11 +120,22 @@ export async function prepare(gh, config, inputs, actor) {
     const owners = await textFile(gh, name, ".github/CODEOWNERS", sha);
     const entries = codeOwnerEntries(owners);
     const catchall = entries.filter((entry) => entry[0] === "*").at(-1);
-    const reviewers = Object.entries(peribolos.orgs[ORG].teams)
-      .filter(([team, settings]) =>
-        team.endsWith("-reviewers") && settings.repos?.[name] === "write",
-      )
-      .map(([team]) => team);
+    const liveTeams = await gh.paginate(gh.rest.teams.list, {
+      org: ORG,
+      per_page: 100,
+    });
+    const reviewers = [];
+    for (const [displayName, settings] of Object.entries(
+      peribolos.orgs[ORG].teams,
+    )) {
+      if (settings.repos?.[name] !== "write") continue;
+      const team = liveTeams.find((team) => team.name === displayName);
+      if (!team)
+        pending.push(
+          `Apply team ${displayName} from peribolos.yml before enrollment.`,
+        );
+      else if (team.slug.endsWith("-reviewers")) reviewers.push(team.slug);
+    }
     const candidates = (catchall?.slice(1) || [])
       .filter(
         (owner) =>
@@ -257,10 +268,8 @@ export async function prepare(gh, config, inputs, actor) {
         ...(bootstrapChoice === "Remove" && name !== REPO ? [BOOTSTRAP] : []),
       ]),
     ]) {
-      const team = await optional(() =>
-        gh.rest.teams.getByName({ org: ORG, team_slug: slug }),
-      );
-      const desired = team && peribolos.orgs[ORG].teams[team.data.name];
+      const team = liveTeams.find((team) => team.slug === slug);
+      const desired = team && peribolos.orgs[ORG].teams[team.name];
       if (!desired) {
         pending.push(
           `Declare team ${slug} in peribolos.yml and apply its team setup first.`,

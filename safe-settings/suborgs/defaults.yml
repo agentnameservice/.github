@@ -37,7 +37,7 @@ labels:
       description: Changes a specification requirement
     - name: stale
       color: ededed
-      description: Waiting on its author; follow GOVERNANCE.md
+      description: Awaiting author response under the ANS inactivity policy
     - name: needs-info
       color: d876e3
       description: Additional information is needed

@@ -1,7 +1,9 @@
 # Contributing to ANS
 
 These guidelines apply across `agentnameservice`. Read the affected repository's
-README for its build and test commands and its `MAINTAINERS.md` for reviewers.
+README for its build and test commands. Find reviewers through the
+[organization teams](https://github.com/orgs/agentnameservice/teams), or ask in
+your pull request.
 Repository-specific contribution instructions may add requirements.
 
 ## Pull requests
@@ -9,7 +11,8 @@ Repository-specific contribution instructions may add requirements.
 Open a tracking issue and reference it with a closing keyword such as `Fixes
 #123`. Use a [Conventional Commits](https://www.conventionalcommits.org/) title.
 Explain the change and how you tested it, and complete the PR template. For
-specification changes, use exactly one of the `editorial` or `normative` labels.
+changes in `ans-registry` or `trust-index-spec`, use exactly one of the
+`editorial` or `normative` labels.
 
 ## Developer Certificate of Origin
 

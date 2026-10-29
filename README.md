@@ -19,14 +19,14 @@ approvals required by governance. Its `members` and
 Keep governance decisions in governance documents and GitHub access in this
 configuration. Repository Maintainer pages link here instead of copying rosters.
 
-Repository Reviewer teams use the `-reviewers` suffix and Write access. The
-repository form includes them in CODEOWNERS requirements without adding them
-to merge allowlists.
+Reviewer team slugs use the `-reviewers` suffix and Write access. Peribolos
+keys use team display names; the form resolves their GitHub slugs for CODEOWNERS
+without renaming teams or adding Reviewers to merge allowlists.
 
 The repository form imports existing checks, preserves their App bindings, and
 opens a PR for the native YAML changes. Merge queues retain loose checks;
-other repositories require an up-to-date branch. Existing merge queues,
-signature requirements and unrelated protections remain in place.
+other repositories require an up-to-date branch. The form preserves existing
+merge-queue settings, signature requirements and unrelated protections.
 
 **Bootstrap access → Keep current** preserves the existing choice and enables
 `tsc-owners` approval/merge access for new enrollments. Select **Remove** only
@@ -37,7 +37,9 @@ after the handoff is approved. DCO, CI and review requirements still apply.
 Install the organization-owned App on the repositories listed in `peribolos.yml`.
 It needs repository Administration, Contents, Checks, Issues and Pull requests
 write access; Commit statuses read access; and organization Members write access.
-Webhooks are disabled. Governance can remain private.
+Safe Settings creates a final check run when applying changes, so Checks write
+is required even with PR comments disabled. Webhooks are disabled. Governance
+can remain private.
 
 | Setting | Location |
 | --- | --- |
@@ -46,14 +48,22 @@ Webhooks are disabled. Governance can remain private.
 | `ORG_MANAGEMENT_ENABLED` | Repository variable; `false` stops management |
 | `ORG_AUTO_APPLY` | Repository variable; `true` applies on pushes and the schedule |
 
+Before activation, complete the approved legacy-access cutover and verify that
+every live team is declared in `peribolos.yml`. Confirm a real queued merge
+with the Maintainer update restriction and DCO checks before extending automation
+to queued repositories. Verify DCO App reporting on merge-group commits before
+binding queued DCO checks to the App or removing the merge-group workflows.
+
 Run **Organization management → preview**, review the plan, then use **apply**.
 Keep automatic apply off until the first run is verified. Teams and memberships
 are reconciled first, protections next, and repository grants last. A failed
 protection step stops the grant step.
 
 Peribolos does not manage org Owners, org-wide membership, repository lifecycle,
-or direct collaborators. It preserves team names. Team deletion is disabled by
-`--maximum-removal-delta=0`; membership and grant changes follow the reviewed YAML.
+or direct collaborators. It preserves team names. `--maximum-removal-delta=0`
+fails the entire run when any existing team is absent from `peribolos.yml`.
+Declare or retire undeclared teams before running preview or apply; membership
+and grant changes follow the reviewed YAML.
 Manual changes to managed teams are reconciled to that configuration.
 
 Peribolos's [native dump](https://github.com/kubernetes-sigs/prow/blob/main/site/content/en/docs/components/cli-tools/peribolos.md#initial-seed)
@@ -64,6 +74,12 @@ this repository. Safe Settings provides a [native repository exporter](https://g
 Only repositories in [the settings scope](safe-settings/deployment-settings.yml)
 receive Safe Settings changes. [Repository configs](safe-settings/repos) can be
 prepared before enrollment. Pausing settings leaves existing access unchanged.
+
+Publish the shared workflow and governance documents before adopting repository
+callers and links. Land each repository's `MAINTAINERS.md`, CODEOWNERS and required
+CI support before enrollment. Create the `editorial` and `normative` labels
+before enabling the contribution-policy workflow in either specification
+repository; the shared defaults maintain those labels after enrollment.
 
 `homebrew-ans` and `scoop-ans` are excluded from protection management because
 GoReleaser publishes their generated package updates directly to `main`.
