@@ -8,14 +8,31 @@ Repository-specific contribution instructions may add requirements.
 
 ## Pull requests
 
-Open a tracking issue and reference it with a closing keyword such as `Fixes
-#123`. Use a [Conventional Commits](https://www.conventionalcommits.org/) title.
-Explain the change and how you tested it, and complete the PR template. For
-changes in `ans-spec` or `trust-index-spec`, use exactly one of the
-`editorial` or `normative` labels.
+Use a [Conventional Commits](https://www.conventionalcommits.org/) title.
+Explain the problem, change, and verification in the PR template. In `ans-spec`
+and `trust-index-spec`, apply exactly one of `editorial` or `normative`.
 
-Dependabot PRs do not need a separate tracking issue. Conventional Commit titles,
-specification labels, and required review, DCO and CI checks still apply.
+A separate issue or proposal is required for normative specification changes,
+breaking changes or deprecations, work requiring coordination across PRs or
+repositories, and new capabilities needing agreement on scope or ongoing
+support. Existing governance and proposal approval requirements still apply.
+
+Self-contained changes may go directly to a PR: contained bug fixes, editorial
+corrections, tests, behavior-preserving refactoring, routine maintenance, and
+straightforward additions such as CLI convenience options or internal helpers.
+The change's impact and coordination needs determine whether an issue is needed,
+not its size or title prefix.
+
+Link existing issues when relevant. Use `Refs #123` for ongoing work and `Fixes
+#123` or `Closes #123` only when the PR completes the issue. If no issue is needed,
+write `No issue needed:` followed by a brief reason in the PR description.
+Maintainers confirm the classification during review and may apply
+`issue-required` to require a reference.
+
+Routine Dependabot updates need neither an issue nor an explanation. Normative,
+explicitly breaking, and `issue-required` PRs still require a reference,
+including Dependabot PRs. Review, DCO, CI, and private security reporting
+requirements continue to apply.
 
 ## Developer Certificate of Origin
 
