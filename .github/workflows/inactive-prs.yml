@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Inactive pull requests
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        description: Report proposed actions without changing pull requests
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: ans-inactive-prs
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: agentnameservice/.github
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Update author-response timers and process reminders
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/inactive-prs.mjs
