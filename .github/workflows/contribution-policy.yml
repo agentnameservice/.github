@@ -33,13 +33,23 @@ jobs:
           author = pr.get('user') or {}
           is_dependabot = author.get('login') == 'dependabot[bot]' and author.get('type') == 'Bot'
           errors = []
-          if not re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spec)(\([^\r\n()]+\))?!?: \S', pr['title']):
+          title = re.match(r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|spec)(\([^\r\n()]+\))?(?P<breaking>!)?: \S', pr['title'])
+          if not title:
               errors.append('Use a Conventional Commit PR title, such as docs: explain the setup.')
           body = re.sub(r'<!--[\s\S]*?-->', '', pr.get('body') or '')
-          if not is_dependabot and not re.search(r'\b(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?)\s+(?:#\d+|[\w.-]+/[\w.-]+#\d+|https://github\.com/[\w.-]+/[\w.-]+/issues/\d+)\b', body, re.I):
-              errors.append('Link a real issue using Fixes, Closes, or Resolves.')
+          labels = {label['name'] for label in pr.get('labels', [])}
+          breaking = (title and title.group('breaking')) or re.search(r'(?im)^[ \t]*BREAKING[ -]CHANGE:', body)
+          issue_required = bool(labels & {'normative', 'issue-required'} or breaking)
+          has_issue = re.search(r'(?<![\w/])(?:[\w.-]+/[\w.-]+)?#[1-9]\d*\b|https://github\.com/[\w.-]+/[\w.-]+/issues/[1-9]\d*\b', body)
+          explanation = re.search(r'(?im)^[ \t]*No issue needed:[ \t]*([^\r\n]*)', body)
+          reason = explanation.group(1).strip() if explanation else ''
+          has_explanation = bool(reason) and not re.fullmatch(r'<[^>]*>|\[[^\]]*\]|\.{3}|…', reason)
+          if not has_issue:
+              if issue_required:
+                  errors.append('Link an issue or proposal for normative, breaking, or issue-required PRs; a No issue needed explanation or Dependabot authorship does not exempt them.')
+              elif not is_dependabot and not has_explanation:
+                  errors.append('Reference an issue (for example, Refs #123) or add No issue needed: followed by a brief reason. Use Fixes or Closes only when this PR completes the issue.')
           if os.environ['SPECIFICATION_REPOSITORY'] == 'true':
-              labels = {label['name'] for label in pr.get('labels', [])}
               if len(labels & {'editorial', 'normative'}) != 1:
                   errors.append('Apply exactly one specification label: editorial or normative.')
           for error in errors:
