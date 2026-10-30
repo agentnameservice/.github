@@ -3,6 +3,11 @@ name: Inactive pull requests
 
 on:
   workflow_call:
+    inputs:
+      dry_run:
+        description: Report proposed actions without changing pull requests
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -30,4 +35,5 @@ jobs:
       - name: Update author-response timers and process reminders
         env:
           GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: node scripts/inactive-prs.mjs

@@ -116,10 +116,17 @@ once those repositories are enrolled.
 
 ### Inactive pull requests
 
-Create the `awaiting-author` and `stale` labels before installing the inactivity
-caller. It starts a 60-day response period when it observes a non-draft PR with
-changes requested and no pending review requests. Existing PRs start a fresh
-period when the workflow first tracks them. After 60 days it posts a reminder;
+The caller defaults to `dry_run: true`. Each run reports proposed actions in
+the Actions log and job summary without changing labels, posting comments, or
+closing PRs. Dry-run does not create or reset timers. Review the
+classifications before changing the caller to `dry_run: false`; this requires
+an explicit configuration change and never happens automatically.
+
+Create the `awaiting-author` and `stale` labels before enabling active mode.
+The first active run starts a 60-day response period when it observes a
+non-draft PR with changes requested and no pending review requests. Existing PRs start a fresh
+period when the workflow first adds `awaiting-author`, regardless of their age.
+An existing timer label retains its timestamp. After 60 days it posts a reminder;
 after another 30 days without an author response it closes the PR, leaving
 related issues open. Authors can reopen a PR when ready to continue.
 

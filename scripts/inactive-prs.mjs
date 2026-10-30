@@ -31,18 +31,18 @@ function waiting(pr) {
     pr.reviewDecision === "CHANGES_REQUESTED" && pr.reviewRequests.totalCount === 0;
 }
 
-export async function processPullRequest(gh, owner, repo, number, event = {}, now = Date.now()) {
+export async function processPullRequest(gh, owner, repo, number, event = {}, now = Date.now(), dryRun = true) {
   const params = { owner, repo, issue_number: number };
   const pr = await snapshot(gh, owner, repo, number);
   async function remove(label) {
-    if (pr.labels.has(label))
+    if (!dryRun && pr.labels.has(label))
       await optional(() => gh.rest.issues.removeLabel({ ...params, name: label }));
   }
   async function restart() {
     await remove(STALE);
     await remove(WAITING);
-    await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
-    return "started a new 60-day author-response period";
+    if (!dryRun) await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
+    return dryRun ? "would start a new 60-day author-response period" : "started a new 60-day author-response period";
   }
   async function unchanged() {
     const current = await snapshot(gh, owner, repo, number);
@@ -51,7 +51,8 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
   if (!waiting(pr)) {
     await remove(STALE);
     await remove(WAITING);
-    return "not waiting on the author";
+    return dryRun && (pr.labels.has(STALE) || pr.labels.has(WAITING))
+      ? "not waiting on the author; would remove inactivity labels" : "not waiting on the author";
   }
   if (!pr.labels.has(WAITING) || event.action === "synchronize" ||
       (event.action === "unlabeled" && event.label?.name === STALE)) {
@@ -87,6 +88,7 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
 
   if (pr.labels.has(STALE) && reminder) {
     if (now - Date.parse(reminder.created_at) < 30 * DAY) return "within the reminder period";
+    if (dryRun) return "would close after the author-response and reminder periods";
     await gh.rest.pulls.update({ owner, repo, pull_number: number, state: "closed" });
     await remove(STALE);
     await remove(WAITING);
@@ -98,8 +100,10 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
   }
   if (now - startedAt < 60 * DAY) {
     await remove(STALE);
-    return "within the author-response period";
+    return dryRun && pr.labels.has(STALE)
+      ? "within the author-response period; would remove the premature stale label" : "within the author-response period";
   }
+  if (dryRun) return reminder ? "would restore stale; the reminder was already posted" : "would remind the author and mark stale";
   // A manually added stale label cannot substitute for a dated reminder from this workflow.
   if (!reminder) {
     await gh.rest.issues.createComment({
@@ -111,7 +115,7 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
   return "reminded the author and marked stale";
 }
 
-export async function run(gh, repository, eventName, event) {
+export async function run(gh, repository, eventName, event, dryRun = true) {
   const [owner, repo] = repository.split("/");
   if (!owner || !repo) throw new Error("GITHUB_REPOSITORY must identify the caller repository");
   if (eventName === "issue_comment" && !event.issue?.pull_request) return;
@@ -122,13 +126,21 @@ export async function run(gh, repository, eventName, event) {
   const numbers = number ? [number] : (await gh.paginate(gh.rest.pulls.list, {
     owner, repo, state: "open", per_page: 100,
   })).map((pr) => pr.number);
+  const results = [];
   for (const candidate of numbers) {
-    const result = await processPullRequest(gh, owner, repo, candidate, event);
-    console.log(`#${candidate}: ${result}`);
+    const result = await processPullRequest(gh, owner, repo, candidate, event, Date.now(), dryRun);
+    const line = `#${candidate}: ${result}`;
+    console.log(line);
+    results.push(line);
   }
+  return results;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const event = JSON.parse(await fs.readFile(process.env.GITHUB_EVENT_PATH, "utf8"));
-  await run(github(), process.env.GITHUB_REPOSITORY, process.env.GITHUB_EVENT_NAME, event);
+  const dryRun = process.env.DRY_RUN !== "false";
+  const results = await run(github(), process.env.GITHUB_REPOSITORY, process.env.GITHUB_EVENT_NAME, event, dryRun);
+  if (process.env.GITHUB_STEP_SUMMARY && results?.length)
+    await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,
+      `## Inactive PRs (${dryRun ? "dry-run; no changes made" : "active"})\n\n${results.map((line) => `- ${line}`).join("\n")}\n`);
 }

@@ -18,3 +18,5 @@ permissions:
 jobs:
   inactive:
     uses: agentnameservice/.github/.github/workflows/inactive-prs.yml@main
+    with:
+      dry_run: true

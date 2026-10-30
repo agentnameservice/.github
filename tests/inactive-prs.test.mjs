@@ -57,13 +57,60 @@ function fixture() {
   return {
     gh, pr, labels, events, comments, reviewComments, reviews, calls,
     day: (day) => { now = START + day * DAY; },
-    tick: (event = {}) => processPullRequest(gh, "agentnameservice", "sample", 1, event, now),
+    tick: (event = {}, dryRun = false) => processPullRequest(gh, "agentnameservice", "sample", 1, event, now, dryRun),
     reply: (collection = comments, login = "author") => {
       collection.push({ body: "Update", user: { login }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
       stamp();
     },
   };
 }
+
+test("observation is the default and does not start a timer", async () => {
+  const f = fixture();
+  const result = await processPullRequest(f.gh, "agentnameservice", "sample", 1);
+  assert.match(result, /would start/);
+  assert.equal(f.labels.size, 0);
+  assert.equal(f.events.length, 0);
+  assert.equal(f.comments.length, 0);
+});
+
+test("dry-run performs no writes for any inactivity transition", async () => {
+  const scenarios = [
+    async () => {},
+    async (f) => { await f.tick(); f.pr.isDraft = true; },
+    async (f) => { await f.tick(); f.day(10); f.labels.add("stale"); },
+    async (f) => { await f.tick(); f.day(60); },
+    async (f) => { await f.tick(); f.day(60); await f.tick(); f.day(90); },
+    async (f) => { await f.tick(); f.day(60); await f.tick(); f.day(70); f.reply(); },
+    async (f) => { await f.tick(); f.day(60); await f.tick(); f.pr.headRefOid = "b".repeat(40); },
+  ];
+  for (const prepare of scenarios) {
+    const f = fixture();
+    await prepare(f);
+    const forbidden = async () => { assert.fail("Dry-run attempted a write"); };
+    f.gh.rest.issues.addLabels = forbidden;
+    f.gh.rest.issues.removeLabel = forbidden;
+    f.gh.rest.issues.createComment = forbidden;
+    f.gh.rest.pulls.update = forbidden;
+    assert.match(await f.tick({}, true), /would/);
+  }
+});
+
+test("a timer begins at activation after an observation period", async () => {
+  const f = fixture();
+  await f.tick({}, true);
+  f.day(100); await f.tick({}, true);
+  assert.equal(f.labels.size, 0);
+  await f.tick();
+  f.day(159); await f.tick();
+  assert.equal(f.comments.length, 0);
+  f.day(160); await f.tick();
+  assert.ok(f.labels.has("stale"));
+  f.day(189); await f.tick();
+  assert.equal(f.pr.state, "OPEN");
+  f.day(190); await f.tick();
+  assert.equal(f.pr.state, "CLOSED");
+});
 
 test("a PR gets a full 60-day response period and 30-day reminder period", async () => {
   const f = fixture();

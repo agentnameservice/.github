@@ -46,6 +46,9 @@ test("the privileged caller uses central code and handles push and author-respon
   const caller = read("workflow-templates/ans-inactive-prs.yml");
   const workflow = read(".github/workflows/inactive-prs.yml");
   assert.equal(caller.jobs.inactive.uses, "agentnameservice/.github/.github/workflows/inactive-prs.yml@main");
+  assert.equal(caller.jobs.inactive.with.dry_run, true);
+  assert.equal(workflow.on.workflow_call.inputs.dry_run.default, true);
+  assert.equal(workflow.jobs.sweep.steps.at(-1).env.DRY_RUN, "${{ inputs.dry_run }}");
   assert.ok(caller.on.pull_request_target.types.includes("synchronize"));
   assert.ok(caller.on.pull_request_target.types.includes("review_requested"));
   assert.ok(caller.on.pull_request_target.types.includes("unlabeled"));
