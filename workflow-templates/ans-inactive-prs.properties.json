@@ -1,0 +1,5 @@
+{
+  "name": "ANS inactive pull requests",
+  "description": "Remind authors after 60 days awaiting changes and close after another 30 days without a response. Requires awaiting-author and stale labels.",
+  "categories": ["Automation"]
+}

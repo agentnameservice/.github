@@ -1,0 +1,40 @@
+name: Reviewer or Maintainer nomination
+description: Propose a repository role with supporting contribution evidence.
+title: 'Nomination: '
+labels: [nomination]
+body:
+  - type: input
+    id: nominee
+    attributes:
+      label: Nominee
+      placeholder: '@handle'
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Role
+      options: [Reviewer, Maintainer]
+    validations:
+      required: true
+  - type: input
+    id: scope
+    attributes:
+      label: Repository or review scope
+      description: Identify the repository and any CODEOWNERS paths covered by this nomination.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Contribution evidence
+      description: Link relevant reviews, implementations, releases, and sustained maintenance work.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Sponsor and decision process
+      description: Name the sponsor and link the applicable eligibility and approval process, including its deadline. Accepted access changes go through reviewed Peribolos configuration and CODEOWNERS updates.
+    validations:
+      required: true

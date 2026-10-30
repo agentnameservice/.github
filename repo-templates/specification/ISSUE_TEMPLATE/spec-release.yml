@@ -1,0 +1,37 @@
+name: Specification release
+description: Coordinate a release in ans-spec or trust-index-spec.
+title: 'Spec release: '
+labels: [release]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version and previous tag
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: Specification changes
+      description: Link normative changes and identify affected schemas, APIs, and conformance vectors.
+    validations:
+      required: true
+  - type: textarea
+    id: implementations
+    attributes:
+      label: Implementation readiness
+      description: Link tracking issues and conformance results for affected implementations and SDKs.
+    validations:
+      required: true
+  - type: textarea
+    id: deferrals
+    attributes:
+      label: Approved deferrals
+      description: Link the decision, responsible Maintainers, and intended catch-up release for each deferral.
+  - type: textarea
+    id: approval
+    attributes:
+      label: Release approval
+      description: Link the applicable release requirements and record the required approvals before tagging.
+    validations:
+      required: true

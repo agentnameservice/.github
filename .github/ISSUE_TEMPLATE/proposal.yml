@@ -1,0 +1,39 @@
+name: Proposal
+description: Discuss a change that needs agreement on scope, compatibility, or support.
+title: 'Proposal: '
+labels: [proposal]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or incorrect, and who is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the resulting behavior. Show current and proposed wording for specification changes.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and maintenance
+      description: Identify affected interfaces, deployments, schemas, implementations, and ongoing support obligations.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision process
+      description: Link the applicable governance process and identify the decision owner, review deadline, and related tracking issues. An issue label does not itself approve the proposal.
+    validations:
+      required: true

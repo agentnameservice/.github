@@ -93,6 +93,59 @@ repository; the shared defaults maintain those labels after enrollment.
 GoReleaser publishes their generated package updates directly to `main`.
 Their Maintainer team access is still managed through Peribolos.
 
+## Shared contribution tooling
+
+| Feature | How repositories receive it |
+| --- | --- |
+| Shared labels | Safe Settings applies `safe-settings/suborgs/defaults.yml` only to repositories in the settings scope, when organization management runs in apply mode. Labels do not inherit from `.github` on their own. |
+| Issue forms | GitHub uses this repository's `.github/ISSUE_TEMPLATE/` as organization defaults for repositories without local issue forms. Local issue-template directories override that fallback; copy any shared forms they need. |
+| Contribution and inactivity workflows | Install a caller from `workflow-templates/` in each repository's `.github/workflows/`. Workflows are not inherited or automatically copied. Callers use the centrally maintained workflow on `main`. |
+| Specification release form | Copy `repo-templates/specification/ISSUE_TEMPLATE/spec-release.yml` into `ans-spec` or `trust-index-spec`, alongside the other forms that repository needs. |
+| GitVote | With the [GitVote App](https://github.com/apps/git-vote) installed, the root `.gitvote.yml` is an organization fallback. A repository's own configuration takes precedence. |
+
+The proposal, specification-tracking, and nomination forms collect the evidence
+and decision process for a change. Labels record its status; they do not approve
+proposals, grant team access, or enforce release acceptance. Governance-only
+forms and quarterly health checks belong in the governance repository.
+
+The contribution check accepts an issue reference or a `No issue needed:`
+explanation. `normative`, `issue-required`, and explicitly breaking PRs require
+a reference even for Dependabot. Create `issue-required` in repositories using
+that override before relying on it; the shared label configuration maintains it
+once those repositories are enrolled.
+
+### Inactive pull requests
+
+Create the `awaiting-author` and `stale` labels before installing the inactivity
+caller. It starts a 60-day response period when it observes a non-draft PR with
+changes requested and no pending review requests. Existing PRs start a fresh
+period when the workflow first tracks them. After 60 days it posts a reminder;
+after another 30 days without an author response it closes the PR, leaving
+related issues open. Authors can reopen a PR when ready to continue.
+
+Pushes, author comments (including review-thread replies and review summaries),
+and new change requests restart the full period. A pending review request,
+approval, draft conversion, or closure removes both labels. Bot comments do not
+restart the clock. Removing `stale` manually
+restarts the period. The timer uses the server timestamp of `awaiting-author`,
+and a close requires a reminder for the current head commit. General PR update
+timestamps and contributor-supplied commit dates do not determine inactivity.
+
+The caller handles trusted base-repository events, including
+`pull_request_target`, and runs a daily sweep. The reusable workflow checks out
+only `agentnameservice/.github` at `main`; it never checks out or executes the
+contributor's branch. Its token is scoped to the calling repository.
+
+### GitVote
+
+Keep the `tsc` team aligned with the eligible voting members before using
+`/vote` (majority) or `/vote-two-thirds`. Both profiles count all eligible voters
+and remain open for seven days. The thresholds implement majority and two-thirds
+for up to nine eligible members, including vacancies. Special voter exclusions
+or a different electorate require a matching profile. These defaults do not
+start votes automatically or replace proposal review periods and other required
+approvals. The GitVote App must have access to the voting repositories and team.
+
 ## Development
 
 ```sh
