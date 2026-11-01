@@ -45,6 +45,16 @@ class ContributionPolicyTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.assertNotEqual(self.run_policy(body=body).returncode, 0)
 
+    def test_incidental_numbers_and_upstream_urls_do_not_count_as_tracking(self):
+        for body in [
+            "This supersedes PR #12.", "See step #2.", "Upstream changelog: #797.",
+            "https://github.com/nodeca/js-yaml/issues/797",
+        ]:
+            with self.subTest(body=body):
+                self.assertNotEqual(self.run_policy(body=body).returncode, 0)
+                result = self.run_policy(body=body, labels=["issue-required"], author="dependabot[bot]", author_type="Bot")
+                self.assertNotEqual(result.returncode, 0)
+
     def test_no_issue_explanation_allows_self_contained_changes(self):
         for title in ["feat(cli): add JSON output", "fix: correct a bug", "docs: fix a typo"]:
             with self.subTest(title=title):
@@ -76,7 +86,7 @@ class ContributionPolicyTests(unittest.TestCase):
             ("feat: remove old option", [], "\n\nBREAKING-CHANGE: The old option is removed."),
         ]:
             for author, author_type in [("contributor", "User"), ("dependabot[bot]", "Bot")]:
-                for body, allowed in [("", False), ("No issue needed: Self-contained change.", False), ("Refs #123", True)]:
+                for body, allowed in [("", False), ("No issue needed: Self-contained change.", False), ("Bumps js-yaml from 4.3.1 to 4.3.2.\n\nCount empty mappings toward the limit, #797.", False), ("Refs #123", True)]:
                     with self.subTest(title=title, labels=labels, footer=footer, author=author, body=body):
                         result = self.run_policy(title=title, labels=labels, body=body + footer, author=author, author_type=author_type)
                         self.assertEqual(result.returncode, 0 if allowed else 1, result.stdout)

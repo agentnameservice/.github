@@ -35,6 +35,6 @@ body:
     id: decision
     attributes:
       label: Sponsor and decision process
-      description: Name the sponsor and link the applicable eligibility and approval process, including its deadline. Accepted access changes go through reviewed Peribolos configuration and CODEOWNERS updates.
+      description: Name the sponsor and link published eligibility and approval rules if available, including the decision deadline. Accepted access changes go through reviewed Peribolos configuration and CODEOWNERS updates.
     validations:
-      required: true
+      required: false

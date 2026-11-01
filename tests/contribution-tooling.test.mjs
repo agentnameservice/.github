@@ -12,7 +12,7 @@ test("every shared form and automation label is provisioned by Safe Settings", (
   assert.equal(names.size, labels.length);
   for (const name of ["issue-required", "awaiting-author", "stale", "proposal", "needs-proposal", "accepted", "accepted-with-changes", "declined"])
     assert.ok(names.has(name), name);
-  for (const directory of [".github/ISSUE_TEMPLATE/", "repo-templates/specification/ISSUE_TEMPLATE/"]) {
+  for (const directory of [".github/ISSUE_TEMPLATE/", "repo-templates/organization/ISSUE_TEMPLATE/", "repo-templates/specification/ISSUE_TEMPLATE/"]) {
     for (const file of fs.readdirSync(new URL(`../${directory}`, import.meta.url))) {
       const form = read(directory + file);
       for (const name of form.labels || []) assert.ok(names.has(name), `${file}: ${name}`);
@@ -20,6 +20,15 @@ test("every shared form and automation label is provisioned by Safe Settings", (
       const ids = form.body.filter((field) => field.id).map((field) => field.id);
       assert.equal(new Set(ids).size, ids.length, file);
     }
+  }
+});
+
+test("governance forms are opt-in and unpublished process links are optional", () => {
+  for (const name of ["proposal", "nomination", "spec-tracking"]) {
+    assert.equal(fs.existsSync(new URL(`../.github/ISSUE_TEMPLATE/${name}.yml`, import.meta.url)), false);
+    const form = read(`repo-templates/organization/ISSUE_TEMPLATE/${name}.yml`);
+    const process = form.body.find((field) => field.id === "decision" || field.id === "coordination");
+    assert.notEqual(process.validations?.required, true);
   }
 });
 
@@ -56,6 +65,7 @@ test("the privileged caller uses central code and handles push and author-respon
   assert.ok(caller.on.schedule.length);
   assert.deepEqual(caller.permissions, workflow.permissions);
   const checkout = workflow.jobs.sweep.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
-  assert.deepEqual(checkout.with, { repository: "agentnameservice/.github", ref: "main", "persist-credentials": false });
-  assert.equal(workflow.concurrency["cancel-in-progress"], false);
+  assert.deepEqual(checkout.with, { repository: "agentnameservice/.github", ref: "${{ job.workflow_sha }}", "persist-credentials": false });
+  assert.deepEqual(caller.jobs.inactive.concurrency, { group: "ans-inactive-prs", queue: "max", "cancel-in-progress": false });
+  assert.equal(workflow.concurrency, undefined);
 });

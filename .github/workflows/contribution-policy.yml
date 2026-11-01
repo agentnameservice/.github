@@ -40,7 +40,7 @@ jobs:
           labels = {label['name'] for label in pr.get('labels', [])}
           breaking = (title and title.group('breaking')) or re.search(r'(?im)^[ \t]*BREAKING[ -]CHANGE:', body)
           issue_required = bool(labels & {'normative', 'issue-required'} or breaking)
-          has_issue = re.search(r'(?<![\w/])(?:[\w.-]+/[\w.-]+)?#[1-9]\d*\b|https://github\.com/[\w.-]+/[\w.-]+/issues/[1-9]\d*\b', body)
+          has_issue = re.search(r'(?im)(?:^|[\s(])(?:refs?|related(?: to)?|see|part of|implements?|tracks?|tracking|address(?:es|ed)?|fix(?:es|ed)?|close[sd]?|resolve[sd]?|proposal|issue)[ \t:]+(?:[\w.-]+/[\w.-]+)?#[1-9]\d*\b|https://github\.com/agentnameservice/[\w.-]+/issues/[1-9]\d*\b', body)
           explanation = re.search(r'(?im)^[ \t]*No issue needed:[ \t]*([^\r\n]*)', body)
           reason = explanation.group(1).strip() if explanation else ''
           has_explanation = bool(reason) and not re.fullmatch(r'<[^>]*>|\[[^\]]*\]|\.{3}|…', reason)

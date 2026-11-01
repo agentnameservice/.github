@@ -98,13 +98,15 @@ Their Maintainer team access is still managed through Peribolos.
 | Feature | How repositories receive it |
 | --- | --- |
 | Shared labels | Safe Settings applies `safe-settings/suborgs/defaults.yml` only to repositories in the settings scope, when organization management runs in apply mode. Labels do not inherit from `.github` on their own. |
-| Issue forms | GitHub uses this repository's `.github/ISSUE_TEMPLATE/` as organization defaults for repositories without local issue forms. Local issue-template directories override that fallback; copy any shared forms they need. |
+| Issue forms | Bug and change-request forms in `.github/ISSUE_TEMPLATE/` are organization defaults where repositories have no local forms. Proposal, nomination and specification-tracking forms are opt-in under `repo-templates/organization/ISSUE_TEMPLATE/`; install them only after their labels exist. Local template directories override the fallback, so copy all forms that repository needs. |
 | Contribution and inactivity workflows | Install a caller from `workflow-templates/` in each repository's `.github/workflows/`. Workflows are not inherited or automatically copied. Callers use the centrally maintained workflow on `main`. |
 | Specification release form | Copy `repo-templates/specification/ISSUE_TEMPLATE/spec-release.yml` into `ans-spec` or `trust-index-spec`, alongside the other forms that repository needs. |
 | GitVote | With the [GitVote App](https://github.com/apps/git-vote) installed, the root `.gitvote.yml` is an organization fallback. A repository's own configuration takes precedence. |
 
-The proposal, specification-tracking, and nomination forms collect the evidence
-and decision process for a change. Labels record its status; they do not approve
+Proposal forms cover coordinated changes and decisions; the default change-request
+form covers self-contained improvements. Proposal, specification-tracking, and
+nomination forms collect evidence and the decision process, with optional links
+to published governance rules. Labels record status; they do not approve
 proposals, grant team access, or enforce release acceptance. Governance-only
 forms and quarterly health checks belong in the governance repository.
 
@@ -112,7 +114,9 @@ The contribution check accepts an issue reference or a `No issue needed:`
 explanation. `normative`, `issue-required`, and explicitly breaking PRs require
 a reference even for Dependabot. Create `issue-required` in repositories using
 that override before relying on it; the shared label configuration maintains it
-once those repositories are enrolled.
+once those repositories are enrolled. Repository-local contribution requirements
+continue to apply until updated; align each repository's `CONTRIBUTING.md` with
+the [shared contribution guide](CONTRIBUTING.md) when adopting the shared check.
 
 ### Inactive pull requests
 
@@ -125,23 +129,28 @@ an explicit configuration change and never happens automatically.
 Create the `awaiting-author` and `stale` labels before enabling active mode.
 The first active run starts a 60-day response period when it observes a
 non-draft PR with changes requested and no pending review requests. Existing PRs start a fresh
-period when the workflow first adds `awaiting-author`, regardless of their age.
-An existing timer label retains its timestamp. After 60 days it posts a reminder;
+period when the workflow adds `awaiting-author` and records the current commit
+in a bot comment, regardless of their age. A missing or mismatched period marker
+starts a fresh period. After 60 days it posts a reminder;
 after another 30 days without an author response it closes the PR, leaving
 related issues open. Authors can reopen a PR when ready to continue.
 
-Pushes, author comments (including review-thread replies and review summaries),
-and new change requests restart the full period. A pending review request,
+Pushes are detected by comparing the current commit with the period marker,
+even when the push event was missed. Pushes, author comments (including review-thread
+replies and review summaries), and new change requests restart the full period. A pending review request,
 approval, draft conversion, or closure removes both labels. Bot comments do not
 restart the clock. Removing `stale` manually
-restarts the period. The timer uses the server timestamp of `awaiting-author`,
+restarts the period; the workflow's own label cleanup does not. The timer uses
+the server timestamp of `awaiting-author`,
 and a close requires a reminder for the current head commit. General PR update
 timestamps and contributor-supplied commit dates do not determine inactivity.
 
 The caller handles trusted base-repository events, including
 `pull_request_target`, and runs a daily sweep. The reusable workflow checks out
-only `agentnameservice/.github` at `main`; it never checks out or executes the
-contributor's branch. Its token is scoped to the calling repository.
+only `agentnameservice/.github` at the commit that defines the executing workflow,
+using `job.workflow_sha`; it never checks out or executes the contributor's branch.
+The caller queues runs in a single concurrency group. Its token is scoped to the
+calling repository.
 
 ### GitVote
 

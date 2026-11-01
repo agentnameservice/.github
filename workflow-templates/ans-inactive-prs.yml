@@ -17,6 +17,10 @@ permissions:
 
 jobs:
   inactive:
+    concurrency:
+      group: ans-inactive-prs
+      queue: max
+      cancel-in-progress: false
     uses: agentnameservice/.github/.github/workflows/inactive-prs.yml@main
     with:
       dry_run: true

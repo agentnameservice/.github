@@ -6,6 +6,7 @@ import { github, optional } from "./github.mjs";
 const DAY = 24 * 60 * 60 * 1000;
 const WAITING = "awaiting-author";
 const STALE = "stale";
+const STARTED = /<!-- ans-inactive-pr waiting head:([a-f0-9]{40}) -->/;
 const REMINDER = /<!-- ans-inactive-pr head:([a-f0-9]{40}) -->/;
 
 async function snapshot(gh, owner, repo, number) {
@@ -41,7 +42,13 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
   async function restart() {
     await remove(STALE);
     await remove(WAITING);
-    if (!dryRun) await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
+    if (!dryRun) {
+      await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
+      await gh.rest.issues.createComment({
+        ...params,
+        body: `Waiting for an author response to the requested changes. This starts a new 60-day response period; please push an update, reply, or re-request review when ready.\n\n<!-- ans-inactive-pr waiting head:${pr.headRefOid} -->`,
+      });
+    }
     return dryRun ? "would start a new 60-day author-response period" : "started a new 60-day author-response period";
   }
   async function unchanged() {
@@ -55,7 +62,7 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
       ? "not waiting on the author; would remove inactivity labels" : "not waiting on the author";
   }
   if (!pr.labels.has(WAITING) || event.action === "synchronize" ||
-      (event.action === "unlabeled" && event.label?.name === STALE)) {
+      (event.action === "unlabeled" && event.label?.name === STALE && event.sender?.login !== "github-actions[bot]")) {
     return restart();
   }
 
@@ -65,13 +72,19 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
     .map((entry) => Date.parse(entry.created_at)));
   if (!startedAt) return "no author-response timestamp available; left unchanged";
   if (events.some((entry) => entry.event === "unlabeled" && entry.label?.name === STALE &&
-      Date.parse(entry.created_at) > startedAt)) return restart();
-  const since = new Date(startedAt).toISOString();
+      entry.actor?.login !== "github-actions[bot]" && Date.parse(entry.created_at) > startedAt)) return restart();
+  // Label and comment timestamps can share the same second; the API filters strictly after since.
+  const since = new Date(startedAt - 1000).toISOString();
   const [comments, reviewComments, reviews] = await Promise.all([
     gh.paginate(gh.rest.issues.listComments, { ...params, since, per_page: 100 }),
     gh.paginate(gh.rest.pulls.listReviewComments, { owner, repo, pull_number: number, since, per_page: 100 }),
     gh.paginate(gh.rest.pulls.listReviews, { owner, repo, pull_number: number, per_page: 100 }),
   ]);
+  const started = comments
+    .filter((comment) => comment.user?.login === "github-actions[bot]" &&
+      STARTED.test(comment.body) && Date.parse(comment.created_at) >= startedAt)
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+  if (!started || started.body.match(STARTED)[1] !== pr.headRefOid) return restart();
   const authorResponded = [...comments, ...reviewComments].some((comment) =>
     comment.user?.login === pr.author?.login && Date.parse(comment.updated_at) > startedAt);
   const reviewActivity = reviews.some((review) => Date.parse(review.submitted_at) > startedAt &&

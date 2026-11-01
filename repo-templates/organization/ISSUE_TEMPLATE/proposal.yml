@@ -34,6 +34,6 @@ body:
     id: decision
     attributes:
       label: Decision process
-      description: Link the applicable governance process and identify the decision owner, review deadline, and related tracking issues. An issue label does not itself approve the proposal.
+      description: Link the published governance process if available, and identify the decision owner, review deadline, and related tracking issues. An issue label does not itself approve the proposal.
     validations:
-      required: true
+      required: false

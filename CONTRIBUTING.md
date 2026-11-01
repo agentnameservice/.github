@@ -26,6 +26,8 @@ not its size or title prefix.
 Link existing issues when relevant. Use `Refs #123` for ongoing work and `Fixes
 #123` or `Closes #123` only when the PR completes the issue. If no issue is needed,
 write `No issue needed:` followed by a brief reason in the PR description.
+Use an explicit relationship such as `Refs #123`, or an ANS issue URL; incidental
+issue numbers and upstream changelog URLs do not count as tracking references.
 Maintainers confirm the classification during review and may apply
 `issue-required` to require a reference.
 

@@ -26,7 +26,7 @@ function fixture() {
     paginate: async (route, params) => {
       calls.push([route, params]);
       if (route === "events") return events;
-      if (route === "comments") return comments;
+      if (route === "comments") return comments.filter((comment) => !params.since || Date.parse(comment.updated_at) > Date.parse(params.since));
       if (route === "reviewComments") return reviewComments;
       if (route === "reviews") return reviews;
       if (route === "pulls") return [{ number: 1 }];
@@ -42,7 +42,11 @@ function fixture() {
           }
           stamp();
         },
-        removeLabel: async ({ name }) => { labels.delete(name); stamp(); },
+        removeLabel: async ({ name }) => {
+          labels.delete(name);
+          events.push({ event: "unlabeled", label: { name }, actor: { login: "github-actions[bot]" }, created_at: new Date(now).toISOString() });
+          stamp();
+        },
         createComment: async ({ body }) => {
           comments.push({ body, user: { login: "github-actions[bot]" }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
           stamp();
@@ -103,7 +107,7 @@ test("a timer begins at activation after an observation period", async () => {
   assert.equal(f.labels.size, 0);
   await f.tick();
   f.day(159); await f.tick();
-  assert.equal(f.comments.length, 0);
+  assert.equal(f.comments.length, 1);
   f.day(160); await f.tick();
   assert.ok(f.labels.has("stale"));
   f.day(189); await f.tick();
@@ -116,12 +120,12 @@ test("a PR gets a full 60-day response period and 30-day reminder period", async
   const f = fixture();
   await f.tick();
   assert.deepEqual([...f.labels], ["awaiting-author"]);
-  assert.equal(f.comments.length, 0);
+  assert.equal(f.comments.length, 1);
   f.day(59); await f.tick();
-  assert.equal(f.comments.length, 0);
+  assert.equal(f.comments.length, 1);
   f.day(60); await f.tick();
   assert.ok(f.labels.has("stale"));
-  assert.equal(f.comments.length, 1);
+  assert.equal(f.comments.length, 2);
   f.day(89); await f.tick();
   assert.equal(f.pr.state, "OPEN");
   f.day(90); await f.tick();
@@ -140,7 +144,7 @@ test("drafts, closed PRs, approvals, and pending reviews clear author-wait label
     Object.assign(f.pr, update);
     f.day(100); await f.tick();
     assert.equal(f.labels.size, 0);
-    assert.equal(f.comments.length, 1);
+    assert.equal(f.comments.length, 2);
   }
 });
 
@@ -215,6 +219,52 @@ test("a changed head cannot be closed using a warning for earlier code", async (
   assert.ok(!f.labels.has("stale"));
 });
 
+test("a missed push before the reminder starts a fresh full response period", async () => {
+  const f = fixture();
+  await f.tick();
+  f.day(30); f.pr.headRefOid = "b".repeat(40);
+  f.day(60); await f.tick();
+  assert.ok(!f.labels.has("stale"));
+  f.day(90); await f.tick();
+  assert.equal(f.pr.state, "OPEN");
+  f.day(120); await f.tick();
+  assert.ok(f.labels.has("stale"));
+  f.day(149); await f.tick();
+  assert.equal(f.pr.state, "OPEN");
+  f.day(150); await f.tick();
+  assert.equal(f.pr.state, "CLOSED");
+});
+
+test("bot cleanup does not defer the author-response clock", async () => {
+  const f = fixture();
+  await f.tick();
+  f.day(10); f.labels.add("stale"); await f.tick();
+  f.day(11); await f.tick({ action: "unlabeled", label: { name: "stale" }, sender: { login: "github-actions[bot]" } });
+  f.day(60); await f.tick();
+  assert.ok(f.labels.has("stale"));
+  f.day(90); await f.tick();
+  assert.equal(f.pr.state, "CLOSED");
+});
+
+test("a missing or contributor-forged period marker starts a fresh timer", async () => {
+  for (const forged of [false, true]) {
+    const f = fixture();
+    await f.tick();
+    f.comments.length = 0;
+    if (forged) {
+      f.day(50); f.reply(f.comments, "contributor");
+      f.comments[0].body = `<!-- ans-inactive-pr waiting head:${f.pr.headRefOid} -->`;
+    }
+    f.day(90); await f.tick();
+    assert.equal(f.pr.state, "OPEN");
+    assert.ok(!f.labels.has("stale"));
+    f.day(149); await f.tick();
+    assert.ok(!f.labels.has("stale"));
+    f.day(150); await f.tick();
+    assert.ok(f.labels.has("stale"));
+  }
+});
+
 test("label history preserves a manual deferral if its workflow event was missed", async () => {
   const f = fixture();
   await f.tick(); f.day(60); await f.tick();
@@ -231,7 +281,7 @@ test("a manually applied stale label cannot bypass the reminder", async () => {
   assert.ok(!f.labels.has("stale"));
   f.day(90); f.labels.add("stale"); await f.tick();
   assert.equal(f.pr.state, "OPEN");
-  assert.equal(f.comments.length, 1);
+  assert.equal(f.comments.length, 2);
   f.day(119); await f.tick();
   assert.equal(f.pr.state, "OPEN");
   f.day(120); await f.tick();
@@ -242,11 +292,11 @@ test("contributor text cannot impersonate the workflow's reminder", async () => 
   const f = fixture();
   await f.tick();
   f.day(60); f.reply(f.comments, "contributor");
-  f.comments[0].body = `<!-- ans-inactive-pr head:${f.pr.headRefOid} -->`;
+  f.comments.at(-1).body = `<!-- ans-inactive-pr head:${f.pr.headRefOid} -->`;
   f.labels.add("stale");
   f.day(90); await f.tick();
   assert.equal(f.pr.state, "OPEN");
-  assert.equal(f.comments.length, 2);
+  assert.equal(f.comments.length, 3);
 });
 
 test("missing timer history does not guess a closure date", async () => {
@@ -268,7 +318,7 @@ test("an update during inspection prevents automatic closure", async () => {
   };
   await f.tick();
   assert.equal(f.pr.state, "OPEN");
-  assert.equal(f.comments.length, 1);
+  assert.equal(f.comments.length, 2);
 });
 
 test("scheduled sweeps paginate open PRs and activity", async (t) => {
