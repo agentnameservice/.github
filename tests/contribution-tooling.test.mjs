@@ -12,7 +12,7 @@ test("every shared form and automation label is provisioned by Safe Settings", (
   assert.equal(names.size, labels.length);
   for (const name of ["issue-required", "awaiting-author", "stale", "proposal", "needs-proposal", "accepted", "accepted-with-changes", "declined"])
     assert.ok(names.has(name), name);
-  for (const directory of [".github/ISSUE_TEMPLATE/", "repo-templates/organization/ISSUE_TEMPLATE/", "repo-templates/specification/ISSUE_TEMPLATE/"]) {
+  for (const directory of [".github/ISSUE_TEMPLATE/", "repo-templates/specification/ISSUE_TEMPLATE/"]) {
     for (const file of fs.readdirSync(new URL(`../${directory}`, import.meta.url))) {
       const form = read(directory + file);
       for (const name of form.labels || []) assert.ok(names.has(name), `${file}: ${name}`);
@@ -23,10 +23,9 @@ test("every shared form and automation label is provisioned by Safe Settings", (
   }
 });
 
-test("governance forms are opt-in and unpublished process links are optional", () => {
+test("shared governance forms are org defaults and unpublished process links are optional", () => {
   for (const name of ["proposal", "nomination", "spec-tracking"]) {
-    assert.equal(fs.existsSync(new URL(`../.github/ISSUE_TEMPLATE/${name}.yml`, import.meta.url)), false);
-    const form = read(`repo-templates/organization/ISSUE_TEMPLATE/${name}.yml`);
+    const form = read(`.github/ISSUE_TEMPLATE/${name}.yml`);
     const process = form.body.find((field) => field.id === "decision" || field.id === "coordination");
     assert.notEqual(process.validations?.required, true);
   }

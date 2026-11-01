@@ -98,7 +98,7 @@ Their Maintainer team access is still managed through Peribolos.
 | Feature | How repositories receive it |
 | --- | --- |
 | Shared labels | Safe Settings applies `safe-settings/suborgs/defaults.yml` only to repositories in the settings scope, when organization management runs in apply mode. Labels do not inherit from `.github` on their own. |
-| Issue forms | Bug and change-request forms in `.github/ISSUE_TEMPLATE/` are organization defaults where repositories have no local forms. Proposal, nomination and specification-tracking forms are opt-in under `repo-templates/organization/ISSUE_TEMPLATE/`; install them only after their labels exist. Local template directories override the fallback, so copy all forms that repository needs. |
+| Issue forms | Forms in `.github/ISSUE_TEMPLATE/` automatically become organization defaults when merged, wherever repositories have no local issue forms. Provision the labels they use before publishing them. Local template directories override the fallback, so copy all forms that repository needs. |
 | Contribution and inactivity workflows | Install a caller from `workflow-templates/` in each repository's `.github/workflows/`. Workflows are not inherited or automatically copied. Callers use the centrally maintained workflow on `main`. |
 | Specification release form | Copy `repo-templates/specification/ISSUE_TEMPLATE/spec-release.yml` into `ans-spec` or `trust-index-spec`, alongside the other forms that repository needs. |
 | GitVote | With the [GitVote App](https://github.com/apps/git-vote) installed, the root `.gitvote.yml` is an organization fallback. A repository's own configuration takes precedence. |
