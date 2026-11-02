@@ -130,8 +130,9 @@ Create the `awaiting-author` and `stale` labels before enabling active mode.
 The first active run starts a 60-day response period when it observes a
 non-draft PR with changes requested and no pending review requests. Existing PRs start a fresh
 period when the workflow adds `awaiting-author` and records the current commit
-in a bot comment, regardless of their age. A missing or mismatched period marker
-starts a fresh period. After 60 days it posts a reminder;
+in a bot comment, regardless of their age. Restarts update that same comment;
+a new comment is created only when the period marker is missing. A missing or
+mismatched period marker starts a fresh period. After 60 days it posts a reminder;
 after another 30 days without an author response it closes the PR, leaving
 related issues open. Authors can reopen a PR when ready to continue.
 

@@ -7,6 +7,7 @@ const DAY = 86_400_000;
 const START = Date.parse("2026-01-01T00:00:00Z");
 function fixture() {
   let now = START;
+  let nextCommentId = 1;
   const labels = new Set();
   const events = [];
   const comments = [];
@@ -48,7 +49,14 @@ function fixture() {
           stamp();
         },
         createComment: async ({ body }) => {
-          comments.push({ body, user: { login: "github-actions[bot]" }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
+          comments.push({ id: nextCommentId++, body, user: { login: "github-actions[bot]" }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
+          stamp();
+        },
+        updateComment: async ({ comment_id, body }) => {
+          const comment = comments.find((entry) => entry.id === comment_id);
+          assert.ok(comment, `Unknown comment: ${comment_id}`);
+          comment.body = body;
+          comment.updated_at = new Date(now).toISOString();
           stamp();
         },
       },
@@ -63,7 +71,7 @@ function fixture() {
     day: (day) => { now = START + day * DAY; },
     tick: (event = {}, dryRun = false) => processPullRequest(gh, "agentnameservice", "sample", 1, event, now, dryRun),
     reply: (collection = comments, login = "author") => {
-      collection.push({ body: "Update", user: { login }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
+      collection.push({ id: nextCommentId++, body: "Update", user: { login }, created_at: new Date(now).toISOString(), updated_at: new Date(now).toISOString() });
       stamp();
     },
   };
@@ -95,6 +103,7 @@ test("dry-run performs no writes for any inactivity transition", async () => {
     f.gh.rest.issues.addLabels = forbidden;
     f.gh.rest.issues.removeLabel = forbidden;
     f.gh.rest.issues.createComment = forbidden;
+    f.gh.rest.issues.updateComment = forbidden;
     f.gh.rest.pulls.update = forbidden;
     assert.match(await f.tick({}, true), /would/);
   }
@@ -164,6 +173,45 @@ test("author replies in either comment channel reset the complete period", async
     f.day(160); await f.tick();
     assert.equal(f.pr.state, "CLOSED");
   }
+});
+
+test("replies and pushes reuse one period comment while preserving the full deadline", async () => {
+  const f = fixture();
+  await f.tick();
+  const marker = { ...f.comments[0] };
+  f.day(1); f.reply(); await f.tick();
+  f.day(3); f.reply(); await f.tick();
+  f.day(5); f.pr.headRefOid = "b".repeat(40); await f.tick({ action: "synchronize" });
+  const markers = f.comments.filter((comment) => comment.user.login === "github-actions[bot]");
+  assert.equal(markers.length, 1);
+  assert.equal(markers[0].id, marker.id);
+  assert.equal(markers[0].created_at, marker.created_at);
+  assert.equal(markers[0].updated_at, new Date(START + 5 * DAY).toISOString());
+  assert.ok(markers[0].body.includes(`waiting head:${f.pr.headRefOid}`));
+  f.day(64); await f.tick();
+  assert.ok(!f.labels.has("stale"));
+  f.day(65); await f.tick();
+  assert.ok(f.labels.has("stale"));
+  f.day(94); await f.tick();
+  assert.equal(f.pr.state, "OPEN");
+  f.day(95); await f.tick();
+  assert.equal(f.pr.state, "CLOSED");
+});
+
+test("a new waiting period reuses the comment from before reviewer handoff", async () => {
+  const f = fixture();
+  await f.tick();
+  const markerId = f.comments[0].id;
+  f.day(10); f.pr.reviewRequests.totalCount = 1; await f.tick();
+  assert.equal(f.labels.size, 0);
+  f.day(20); f.pr.reviewRequests.totalCount = 0; await f.tick();
+  assert.equal(f.comments.length, 1);
+  assert.equal(f.comments[0].id, markerId);
+  assert.equal(f.comments[0].updated_at, new Date(START + 20 * DAY).toISOString());
+  f.day(79); await f.tick();
+  assert.ok(!f.labels.has("stale"));
+  f.day(80); await f.tick();
+  assert.ok(f.labels.has("stale"));
 });
 
 test("edited author replies reset the period", async () => {

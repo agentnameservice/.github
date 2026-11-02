@@ -40,16 +40,20 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
       await optional(() => gh.rest.issues.removeLabel({ ...params, name: label }));
   }
   async function restart() {
+    if (dryRun) return "would start a new 60-day author-response period";
+    const comments = await gh.paginate(gh.rest.issues.listComments, { ...params, per_page: 100 });
+    const marker = comments
+      .filter((comment) => comment.user?.login === "github-actions[bot]" && STARTED.test(comment.body))
+      .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
     await remove(STALE);
     await remove(WAITING);
-    if (!dryRun) {
-      await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
-      await gh.rest.issues.createComment({
-        ...params,
-        body: `Waiting for an author response to the requested changes. This starts a new 60-day response period; please push an update, reply, or re-request review when ready.\n\n<!-- ans-inactive-pr waiting head:${pr.headRefOid} -->`,
-      });
-    }
-    return dryRun ? "would start a new 60-day author-response period" : "started a new 60-day author-response period";
+    await gh.rest.issues.addLabels({ ...params, labels: [WAITING] });
+    const body = `Waiting for an author response to the requested changes. This starts a new 60-day response period; please push an update, reply, or re-request review when ready.\n\n<!-- ans-inactive-pr waiting head:${pr.headRefOid} -->`;
+    if (marker)
+      await gh.rest.issues.updateComment({ owner, repo, comment_id: marker.id, body });
+    else
+      await gh.rest.issues.createComment({ ...params, body });
+    return "started a new 60-day author-response period";
   }
   async function unchanged() {
     const current = await snapshot(gh, owner, repo, number);
@@ -82,8 +86,8 @@ export async function processPullRequest(gh, owner, repo, number, event = {}, no
   ]);
   const started = comments
     .filter((comment) => comment.user?.login === "github-actions[bot]" &&
-      STARTED.test(comment.body) && Date.parse(comment.created_at) >= startedAt)
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+      STARTED.test(comment.body) && Date.parse(comment.updated_at) >= startedAt)
+    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0];
   if (!started || started.body.match(STARTED)[1] !== pr.headRefOid) return restart();
   const authorResponded = [...comments, ...reviewComments].some((comment) =>
     comment.user?.login === pr.author?.login && Date.parse(comment.updated_at) > startedAt);
