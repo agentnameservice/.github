@@ -27,6 +27,13 @@ orgs:
         privacy: closed
         repos:
           ans-openshell: write
+      ans-openshell-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
+        privacy: closed
+        repos:
+          ans-openshell: write
       sdk-go-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
