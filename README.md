@@ -19,6 +19,10 @@ approvals required by governance. Its `members` and
 Keep governance decisions in governance documents and GitHub access in this
 configuration. Repository Maintainer pages link here instead of copying rosters.
 
+Create Reviewer teams during code and specification repository onboarding, even
+when their membership is empty. Include them in repository CODEOWNERS so later
+appointments only require a membership change here.
+
 Reviewer team slugs use the `-reviewers` suffix and Write access. Peribolos
 keys use team display names; the form resolves their GitHub slugs for CODEOWNERS
 without renaming teams or adding Reviewers to merge allowlists.
