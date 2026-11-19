@@ -1,0 +1,5 @@
+{
+  "name": "ANS inactive pull requests",
+  "description": "Observe proposed inactivity actions first; active mode reminds after 60 days and closes after 30 more. Active mode requires awaiting-author and stale labels.",
+  "categories": ["Automation"]
+}

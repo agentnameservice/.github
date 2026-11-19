@@ -9,6 +9,12 @@ orgs:
         privacy: closed
         repos:
           ans-gateway-auth: write
+      ans-gateway-auth-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members: []
+        privacy: closed
+        repos:
+          ans-gateway-auth: write
       ans-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
@@ -27,6 +33,19 @@ orgs:
         privacy: closed
         repos:
           ans-openshell: write
+      ans-openshell-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members:
+          - chou-godaddy
+        privacy: closed
+        repos:
+          ans-openshell: write
+      ans-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members: []
+        privacy: closed
+        repos:
+          ans: write
       sdk-go-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
@@ -37,6 +56,12 @@ orgs:
           ans-sdk-go: write
           homebrew-ans: write
           scoop-ans: write
+      sdk-go-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members: []
+        privacy: closed
+        repos:
+          ans-sdk-go: write
       sdk-java-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
@@ -61,12 +86,24 @@ orgs:
         privacy: closed
         repos:
           ans-sdk-rust: write
+      sdk-rust-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members: []
+        privacy: closed
+        repos:
+          ans-sdk-rust: write
       spec-maintainers:
         description: 'ANS governance roster: repository Maintainers'
         maintainers:
           - csnitker-godaddy
           - kperry-godaddy
           - scourtney-godaddy
+        privacy: closed
+        repos:
+          ans-spec: write
+      spec-reviewers:
+        description: 'ANS governance roster: repository Reviewers'
+        members: []
         privacy: closed
         repos:
           ans-spec: write

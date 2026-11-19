@@ -30,6 +30,33 @@ rulesets:
 
 labels:
   include:
+    - name: issue-required
+      color: fbca04
+      description: A tracking issue or proposal is required before merge
+    - name: proposal
+      color: '0e8a16'
+      description: A proposed change requiring a recorded decision
+    - name: needs-proposal
+      color: fbca04
+      description: A proposal decision is needed before implementation can merge
+    - name: accepted
+      color: '0e8a16'
+      description: Proposal accepted
+    - name: accepted-with-changes
+      color: '0e8a16'
+      description: Proposal accepted with changes recorded in the decision
+    - name: declined
+      color: b60205
+      description: Proposal declined with reasons recorded in the decision
+    - name: nomination
+      color: 1d76db
+      description: Reviewer or Maintainer nomination
+    - name: spec-tracking
+      color: d93f0b
+      description: Implementation work associated with a specification change
+    - name: release
+      color: '0052cc'
+      description: Release coordination
     - name: editorial
       color: '0075ca'
       description: No normative specification change
@@ -39,6 +66,9 @@ labels:
     - name: stale
       color: ededed
       description: Awaiting author response under the ANS inactivity policy
+    - name: awaiting-author
+      color: fbca04
+      description: Changes requested with no pending review request; inactivity clock starts here
     - name: needs-info
       color: d876e3
       description: Additional information is needed

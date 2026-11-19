@@ -1,0 +1,18 @@
+profiles:
+  default:
+    duration: 7days
+    pass_threshold: 51
+    pass_threshold_base: allowed_voters
+    allowed_voters:
+      teams: [tsc]
+    close_on_passing: false
+    periodic_status_check: 3 days
+  two-thirds:
+    duration: 7days
+    # Rounding up to 66.67 would reject exactly two thirds of three, six, or nine voters.
+    pass_threshold: 66.66
+    pass_threshold_base: allowed_voters
+    allowed_voters:
+      teams: [tsc]
+    close_on_passing: false
+    periodic_status_check: 3 days

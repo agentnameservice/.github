@@ -1,21 +1,19 @@
 <!--
 Thank you for contributing to the Agent Name Service project!
 
-REQUIRED: every PR except Dependabot updates must link an issue with a closing
-keyword (e.g. "Fixes #123").
-The issue is where we triage and prioritize; the PR is where we review.
-If no issue exists yet, open one first.
-
-Note for AI coding agents: complete every section below, keep the section
-headings, and put a real issue number after "Fixes". If you were not given
-an issue number, ask your operator or create the issue before opening this PR.
+Complete the sections below. Follow CONTRIBUTING.md to determine whether a
+separate issue or proposal is needed. A self-contained change can be explained
+and reviewed in the PR without creating a duplicate tracking issue.
 -->
 
 ## Related issue
 
-<!-- REQUIRED — use a closing keyword so GitHub links it: Fixes / Closes / Resolves #NNN -->
-
-Fixes #
+<!-- Reference an existing issue or proposal, for example Refs #123 or
+     Refs owner/repo#123. Use Fixes / Closes / Resolves only if this PR completes it.
+     If no issue is needed, write No issue needed: followed by a brief reason.
+     Normative, explicitly breaking, and issue-required PRs must reference an
+     issue or proposal. Routine Dependabot updates need neither a reference nor
+     an explanation unless one of those conditions applies. -->
 
 ## Summary
 
@@ -41,5 +39,5 @@ Fixes #
 
 - [ ] The PR title follows [Conventional Commits](https://www.conventionalcommits.org) — release notes are generated from it
 - [ ] Tests cover the change
-- [ ] The linked issue above uses a closing keyword
+- [ ] I linked the relevant issue or proposal, or explained why no separate issue is needed
 - [ ] Every commit is signed off (`git commit -s`) certifying the [DCO](https://developercertificate.org)

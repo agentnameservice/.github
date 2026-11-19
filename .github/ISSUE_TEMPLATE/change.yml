@@ -1,5 +1,5 @@
 name: Change request
-description: Discuss a change before opening a pull request.
+description: Suggest a self-contained improvement to existing behavior.
 body:
   - type: textarea
     id: problem

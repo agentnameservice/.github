@@ -1,0 +1,37 @@
+name: Specification tracking
+description: Track implementation work associated with a specification change.
+title: 'Spec tracking: '
+labels: [spec-tracking]
+body:
+  - type: input
+    id: specification
+    attributes:
+      label: Specification change
+      description: Link the specification PR or accepted proposal.
+    validations:
+      required: true
+  - type: input
+    id: release
+    attributes:
+      label: Target specification release
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation work
+      description: Describe the required behavior and link implementation PRs as they become available.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Conformance and verification
+      description: Identify affected conformance vectors and how the implementation will be verified.
+    validations:
+      required: true
+  - type: textarea
+    id: coordination
+    attributes:
+      label: Release dependencies or deferrals
+      description: State whether this work blocks a release. Link any approved deferral and its decision owner.
