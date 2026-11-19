@@ -2,9 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import yaml from "js-yaml";
+import os from "node:os";
+import path from "node:path";
+import { load } from "js-yaml";
+import { readYaml, writeYaml } from "../scripts/config.mjs";
 
-const read = (path) => yaml.load(fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
+const read = (file) => load(fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
 
 test("every shared form and automation label is provisioned by Safe Settings", () => {
   const labels = read("safe-settings/suborgs/defaults.yml").labels.include;
@@ -67,4 +70,25 @@ test("the privileged caller uses central code and handles push and author-respon
   assert.deepEqual(checkout.with, { repository: "agentnameservice/.github", ref: "${{ job.workflow_sha }}", "persist-credentials": false });
   assert.deepEqual(caller.jobs.inactive.concurrency, { group: "ans-inactive-prs", queue: "max", "cancel-in-progress": false });
   assert.equal(workflow.concurrency, undefined);
+});
+
+test("the YAML helpers round-trip nested, shared and long values without anchors or long lines", async () => {
+  const shared = { members: ["alice"], repos: {} };
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "ans-yaml-"));
+  try {
+    for (const [name, value] of [
+      ["nested", { rulesets: [{ name: "ANS baseline", rules: [{ type: "required_status_checks", parameters: { strict_required_status_checks_policy: true } }] }] }],
+      ["shared", { first: shared, second: shared }],
+      ["long", { description: "word ".repeat(40).trim() }],
+    ]) {
+      const file = path.join(directory, "repos", `${name}.yml`);
+      await writeYaml(file, value);
+      const text = fs.readFileSync(file, "utf8");
+      assert.doesNotMatch(text, /[&*]/, name);
+      assert.ok(text.split("\n").every((line) => line.length <= 100), name);
+      assert.deepEqual(await readYaml(file), value, name);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });

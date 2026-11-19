@@ -2,7 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import yaml from "js-yaml";
+import { load, dump } from "js-yaml";
 
 export const ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -33,11 +33,11 @@ export function repositoryName(value) {
   return name;
 }
 export async function readYaml(file) {
-  return yaml.load(await fs.readFile(file, "utf8"));
+  return load(await fs.readFile(file, "utf8"));
 }
 export async function writeYaml(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, yaml.dump(value, { lineWidth: 100, noRefs: true }));
+  await fs.writeFile(file, dump(value, { lineWidth: 100, noRefs: true }));
 }
 export function access(name, config) {
   repositoryName(name);
